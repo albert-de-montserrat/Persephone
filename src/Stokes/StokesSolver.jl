@@ -27,7 +27,7 @@ function solveStokes(U, P, gr, Ucartesian,Upolar, g, ρ, η, 𝓒,
             U,Rhs = _apply_bcs(U,KK,Rhs,∂Ωu,ufix)
         end
 
-        @timeit to "PCG solver" U,P = StokesPcCG(U, P, KK, MM, GG, Rhs, ifree)
+        @timeit to "PCG solver" U, P = StokesPcCG(U, P, KK, MM, GG, Rhs, ifree)
         # U, Ucart, Upolar, Ucartesian = updatevelocity(U,Ucartesian, Upolar,  gr.θ, gr.r, TT)
 
         @timeit to "Remove net rotation" U, Ucart, Upolar, Ucartesian = updatevelocity2(U, Ucartesian, Upolar, ρ, TT, coordinates, gr)

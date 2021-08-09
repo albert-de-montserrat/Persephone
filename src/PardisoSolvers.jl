@@ -33,26 +33,26 @@ function _MKLfactorize(KK:: SparseMatrixCSC,Rhs::Vector,ifree::Vector; verbose =
 end 
 
 
-function _MKLsolve!(T::Vector, A_pardiso::SparseMatrixCSC, ps::MKLPardisoSolver, Rhs::Vector{Float64}, ifree::Vector{Int64})
+# function _MKLsolve!(T::Vector, A_pardiso::SparseMatrixCSC, ps::MKLPardisoSolver, Rhs::Vector{Float64}, ifree::Vector{Int64})
     
-    B = Rhs[ifree]
-    X = similar(B)
+#     B = Rhs[ifree]
+#     X = similar(B)
     
-    # Compute the solutions X using the symbolic factorization.
-    set_phase!(ps, Pardiso.SOLVE_ITERATIVE_REFINE)
-    pardiso(ps, X, A_pardiso, B)
+#     # Compute the solutions X using the symbolic factorization.
+#     set_phase!(ps, Pardiso.SOLVE_ITERATIVE_REFINE)
+#     pardiso(ps, X, A_pardiso, B)
 
-    @turbo for i ∈ 1:length(ifree)
-        T[ifree[i]] =  X[i]
-    end
+#     @turbo for i ∈ 1:length(ifree)
+#         T[ifree[i]] =  X[i]
+#     end
 
-end
+# end
 
-function _MKLrelease!(ps::MKLPardisoSolver)
-    # Free the PARDISO data structures.
-    set_phase!(ps, Pardiso.RELEASE_ALL)
-    pardiso(ps)
-end
+# function _MKLrelease!(ps::MKLPardisoSolver)
+#     # Free the PARDISO data structures.
+#     set_phase!(ps, Pardiso.RELEASE_ALL)
+#     pardiso(ps)
+# end
 
 function _MKLpardiso!(T::Vector{Float64}, KK:: SparseMatrixCSC,Rhs::Vector{Float64},ifree::Vector{Int64})
     

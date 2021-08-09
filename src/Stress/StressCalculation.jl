@@ -345,10 +345,10 @@ end
         k4zx = Δt*(∂Uz∂xᵢ*Fxxi + ∂Uz∂zᵢ*Fzxi)
         k4zz = Δt*(∂Uz∂xᵢ*Fxzi + ∂Uz∂zᵢ*Fzzi)
         # last step
-        Fxx_blk[i] = (k1xx + 2*(k2xx + k3xx) + k4xx)*one_sixth
-        Fxz_blk[i] = (k1xz + 2*(k2xz + k3xz) + k4xz)*one_sixth
-        Fzx_blk[i] = (k1zx + 2*(k2zx + k3zx) + k4zx)*one_sixth
-        Fzz_blk[i] = (k1zz + 2*(k2zz + k3zz) + k4zz)*one_sixth
+        Fxz_blk[i] += (k1xz + 2*(k2xz + k3xz) + k4xz)*one_sixth
+        Fxx_blk[i] += (k1xx + 2*(k2xx + k3xx) + k4xx)*one_sixth
+        Fzx_blk[i] += (k1zx + 2*(k2zx + k3zx) + k4zx)*one_sixth
+        Fzz_blk[i] += (k1zz + 2*(k2zz + k3zz) + k4zz)*one_sixth
     end
 
 end

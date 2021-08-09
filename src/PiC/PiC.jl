@@ -673,7 +673,7 @@ end
 
 function ΔTsubgrid2node(ΔT, particle_fields, particle_info, particle_weights, gr)
 
-    EL2NOD_P1, EL2NOD = gr.e2n_p1, gr.e2n
+    EL2NOD_P1 = gr.e2n_p1
     	
     #=  Build arrays  =#
     t = [p.t for p in particle_info]
@@ -693,14 +693,12 @@ function ΔTsubgrid2node(ΔT, particle_fields, particle_info, particle_weights, 
     nn = view(EL2NOD_P1, :, t)'
     A1 = kernel2(nn, A, true) # accumarray -> ∑Tᵢ*ωᵢ
     A2 = kernel2(nn, w, true) # accumarray -> ∑ωᵢ
-    ΔT_subgrid = vec(A1./A2) # -> ∑Tᵢ*ωᵢ/∑ωᵢ
-    ΔT_remaining = ΔT .- ΔT_subgrid
-    
-#    ΔT_remaining = similar(A1)
-#    @inbounds for i in eachindex(A1)
-#	ΔT_remaining[i] = ΔT[i] - A1[i][1]/A2[i][1]
-#    end
-    
+
+    ΔT_remaining = similar(A1)
+    @turbo for i in axes(A1,1)
+        ΔT_remaining[i] = ΔT[i] - A1[i]/A2[i]
+    end
+
     nodalfield2partcle(ΔT_remaining, EL2NOD_P1, particle_weights, particle_info) # interpolate to particles
  
     # # ΔT_subgrid in element vertices node

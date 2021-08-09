@@ -7,6 +7,8 @@
     itmin_Pat = 10
     itnum = 0
 
+    fill!(U, 0.0)
+    fill!(P, 0.0)
     nU = length(Rhs) 
     z = fill(0.0,nU)
     # forces resulting from pressure gradients
