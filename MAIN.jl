@@ -22,7 +22,7 @@ function main()
         MAKE GRID
     =========================================================================#
     split = 2
-    N = 3
+    N = 4
     if split == 1
         nr = Int(1 + 2^N)
         nθ = Int(12 * 2^N)
@@ -37,15 +37,6 @@ function main()
     IDs = point_ids(gr)
     load = false
 
-    # unpack 
-    # θ = gr.θ
-    # r = gr.r
-    # gr.e2n = gr.e2n
-    # EL2NOD_P1 = gr.e2n_p1
-    # nel = gr.nel
-    # nnod = gr.nnod
-    # gr.e2nP = gr.e2nP
-    # neighbours0 = gr.neighbours
     PhaseID = 1
     min_inradius = inradius(gr)
 
@@ -60,7 +51,7 @@ function main()
     #=========================================================================
         SETUP BLAS THREADS:    
     =========================================================================#
-    LinearAlgebra.BLAS.set_num_threads(1) 
+    # LinearAlgebra.BLAS.set_num_threads(1) 
 
     #=========================================================================
         Delete existing statistics file    
@@ -126,7 +117,7 @@ function main()
     init_particle_temperature!(particle_fields, particle_info)
     ΔT = similar(T)
 
-    viscosity_type = "TemperatureDependantAnisotropic"
+    viscosity_type = "TemperatureDependantIsotropic"
     #= Options:
         (*) "IsoviscousIsotropic"
         (*) "TemperatureDependantIsotropic"
@@ -308,15 +299,6 @@ function main()
                         to
                     )
                 end
-
-                # @timeit to "T → particle" begin
-                #     particle_fields = T2particle(particle_fields,
-                #                                  EL2NOD_P1,
-                #                                  T,
-                #                                  particle_info,
-                #                                  particle_weights)
-                #     # T2particle_cubic!(particle_fields, gr, T, particle_info)
-                # end
 
                 @timeit to "advection" particle_info, to = advection_RK2(
                     particle_info,
