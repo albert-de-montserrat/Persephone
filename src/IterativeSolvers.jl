@@ -1,4 +1,3 @@
-
 # PRECONDITIONED CONJUGATE GRADIENTS ================================================================
 @inline  function StokesPcCG(U,P,KK,MM,GG,Rhs,ifree)
     
@@ -7,10 +6,11 @@
     itmin_Pat = 10
     itnum = 0
 
-    fill!(U, 0.0)
-    fill!(P, 0.0)
+    # fill!(U, 0.0)
+    # fill!(P, 0.0)
     nU = length(Rhs) 
-    z = fill(0.0,nU)
+    z = fill(0.0, nU)
+    
     # forces resulting from pressure gradients
     Rhs += GG*P
     # guess of the velocity field 

@@ -1,4 +1,4 @@
-include("/home/albert/Documents/JuM2TRI/NoAvx/Plotting/misc.jl")
+include(joinpath(pwd(), "Plotting/misc.jl"))
 using DelimitedFiles
 
 function plot_stats(fstats)

@@ -344,7 +344,7 @@ function addreject(T, F, gr, θThermal, rThermal, IC, particle_info, particle_we
     vertices = [Point2D{Polar}(rand(),rand()) for _ in 1:3] # element vertices 
     t0 = [particle_info[i].t for i in axes(particle_info,1)]
 
-    max_ppel, min_ppel = 15, 12
+    max_ppel, min_ppel = 15, 8
 
     # --- Find number of particles per element    
     reps, irem = getreps(t0, nel, max_ppel)
@@ -478,7 +478,7 @@ function particles_generator(θ3, r3, IntC, e2n_p1)
     vertices        = [Point2D{Polar}(rand(),rand()) for _ in 1:3] # element vertices 
     particle_info   = PINFO[]    
     particle_weights= PWEIGHTS[]   
-    nrand           = 16
+    nrand           = 25
     # bary_coords     = Vector{Float64}(undef,3)
     node_weights    = zeros(3)
     ip_weights      = similar(node_weights)

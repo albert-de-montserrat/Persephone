@@ -1,5 +1,4 @@
 using GLMakie
-using AbstractPlotting
 using ColorSchemes
 import Statistics: mean
 

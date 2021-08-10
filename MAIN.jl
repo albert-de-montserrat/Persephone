@@ -10,7 +10,7 @@ function main()
         path = "/storage2/unipd/navarro/AnnulusBenchmarks"
         folder = "Anisotropic_1e4_2"
     else
-        path = "output"
+        path = "/home/albert/Desktop/output"
         folder = "test"
     end
     filename = "file"
@@ -22,7 +22,7 @@ function main()
         MAKE GRID
     =========================================================================#
     split = 2
-    N = 4
+    N = 3
     if split == 1
         nr = Int(1 + 2^N)
         nθ = Int(12 * 2^N)
@@ -51,7 +51,7 @@ function main()
     #=========================================================================
         SETUP BLAS THREADS:    
     =========================================================================#
-    # LinearAlgebra.BLAS.set_num_threads(1) 
+    LinearAlgebra.BLAS.set_num_threads(1) 
 
     #=========================================================================
         Delete existing statistics file    
@@ -117,7 +117,7 @@ function main()
     init_particle_temperature!(particle_fields, particle_info)
     ΔT = similar(T)
 
-    viscosity_type = "TemperatureDependantIsotropic"
+    viscosity_type = "IsoviscousAnisotropic"
     #= Options:
         (*) "IsoviscousIsotropic"
         (*) "TemperatureDependantIsotropic"
