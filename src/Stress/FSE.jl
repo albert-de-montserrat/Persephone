@@ -37,9 +37,9 @@ function local_FSE!(FSE, F, iel)
     )
 end
 
-function FSEips(U, particle_fields, particle_weights, particle_info, gr,  Δt)
+function FSEips(U, particle_fields, particle_weights, particle_info, gr, coordinates, Δt)
     
-    EL2NOD, θ, r = gr.e2n, gr.θ, gr.r
+    EL2NOD, θ, r = gr.e2n, coordinates.θ, coordinates.r
     
     # ============================================ SCALE Velocity
     Uscaled = U.*1
@@ -81,13 +81,12 @@ function FSEips(U, particle_fields, particle_weights, particle_info, gr,  Δt)
         # Parent element
         iel = particle_info[ipart].t_parent
 
-        # Polar coordinates of element nodes
-        θ_el = [θ[i,iel] for i in 1:3]
-        r_el = [r[i,iel] for i in 1:3]
-        coordinates = SMatrix{3,2}([θ_el r_el])
-       
+        θ_el = @SVector [θ[i, iel] for i in 1:3]
+        r_el = @SVector [r[i, iel] for i in 1:3]
+        coords = SMatrix{3,2}([θ_el r_el])
+    
         # Jacobian n. 1 (p:=polar, l:=local): reference element --> current element
-        J_pl = dN3ds*coordinates
+        J_pl = dN3ds * coords
         detJ_pl = det(J_pl) # fast |-> unrolled
         
         # the Jacobian ∂ξ∂θ to transform local (ξ, η) into global (θ,r) derivatives
@@ -108,14 +107,14 @@ function FSEips(U, particle_fields, particle_weights, particle_info, gr,  Δt)
         F = @SMatrix [particle_fields.Fxx[ipart]    particle_fields.Fxz[ipart] 
                       particle_fields.Fzx[ipart]    particle_fields.Fzz[ipart]]
 
-        N3, ∇N = get_N_∇N(particle_weights[ipart].barycentric[1],
-                          particle_weights[ipart].barycentric[2],
-                          1,
-                          nn3)
-        
+        # compute shape functions 
+        λ = local_coordinates(coords,  particle_info[ipart].CPolar)
+
+        N3, ∇N = sf_N_tri3(λ[1], λ[2]), sf_dN_tri3(λ[1], λ[2])
+
         # Polar coordinates of the integration points
-        θ_ip = mydot(θ_el, N3[1])
-        r_ip = mydot(r_el, N3[1])
+        θ_ip = mydot(θ_el, N3)
+        r_ip = mydot(r_el, N3)
         cos_ip = cos(θ_ip)
         sin_ip = sin(θ_ip)
         
@@ -125,7 +124,7 @@ function FSEips(U, particle_fields, particle_weights, particle_info, gr,  Δt)
         invJ_double = transformation*∂ξ∂θ
         
         # Partial derivatives
-        ∂N∂x = invJ_double*∇N[1]
+        ∂N∂x = invJ_double*∇N
         # B Matrix
         B1 = @SMatrix [∂N∂x[1,1]  0.0
                        0.0        ∂N∂x[2,1]

@@ -29,20 +29,6 @@ end
 
 end
 
-@inline function _get_SF(nip, nnodel)
-    x_ip, w_ip = ip_triangle(nip)
-        # local coordinates and weights of points for integration of
-        # velocity/pressure matrices
-    N,dNds = shape_functions_triangles(x_ip,nnodel)
-        # velocity shape functions and their derivatives
-    dN3ds = @SMatrix [-1.0   1.0   0.0 # w.r.t. r
-                      -1.0   0.0   1.0]
-        # derivatives of linear (3-node) shape functions; used to calculate
-        # each element's Jacobian  
-        
-    return N,dNds,dN3ds,w_ip
-end
-
 function elementcoordinate(GlobC,e2n)
     m,n = size(e2n)
     x = Array{Float64,2}(undef,m,n)

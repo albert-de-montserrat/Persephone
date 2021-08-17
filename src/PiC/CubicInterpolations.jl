@@ -47,6 +47,27 @@ end
 
 end 
 
+@inline function local_coordinates(vc::SMatrix{3, 2, Float64, 6}, pc::Point2D{T}) where {T}
+    # Coordinates of triangle's vertices
+    x1,x2,x3 = vc[1,1], vc[2,1], vc[3,1]
+    z1,z2,z3 = vc[1,2], vc[2,2], vc[3,2]
+    # Coordinates of query point
+    x, z = pc.x, pc.z
+
+    denom = -x1*z3 + x1*z2 - x2*z1 + z2*z3 + x3*z1 - x3*z2
+    
+    λ2 = (-( -x1*z + x1*z3 - x3*z1 + x*z1 +x3*z -x*z3 ) ) /
+          denom
+
+    λ3 = (x1*z2 - x1*z - x2*z1 + x2*z + x*z1 -x*z2) /
+          denom
+        
+    λ1 = 1 - (λ3+λ3)
+
+    return @SVector [λ1, λ2, λ3]
+
+end 
+
 @inline quasicubic_SF(λ) = @SVector [λ[1],
                                      λ[2],
                                      λ[3],

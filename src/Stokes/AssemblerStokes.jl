@@ -61,7 +61,7 @@ function solve_stokes_threaded(
 
         @timeit to "PCG solver" U,P = StokesPcCG(U, P, KS, MS, GS, FS, ufree)
 
-        @timeit to "Remove net rotation" U, Ucart, Upolar, Ucartesian = updatevelocity2(U, Ucartesian, Upolar, ρ, TT, θ, r, gr)
+        @timeit to "Remove net rotation" U, Ucart, Upolar, Ucartesian = updatevelocity2(U, Ucartesian, Upolar, ρ, TT, coordinates, gr)
 
         
     end

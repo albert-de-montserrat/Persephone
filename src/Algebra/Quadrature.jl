@@ -23,6 +23,21 @@ struct ShapeFunctionsStokes{T}
     N3::Vector{SMatrix{1,3,T,3}}
 end
 
+
+@inline function _get_SF(nip, nnodel)
+    x_ip, w_ip = ip_triangle(nip)
+        # local coordinates and weights of points for integration of
+        # velocity/pressure matrices
+    N,dNds = shape_functions_triangles(x_ip,nnodel)
+        # velocity shape functions and their derivatives
+    dN3ds = @SMatrix [-1.0   1.0   0.0 # w.r.t. r
+                      -1.0   0.0   1.0]
+        # derivatives of linear (3-node) shape functions; used to calculate
+        # each element's Jacobian  
+        
+    return N,dNds,dN3ds,w_ip
+end
+
 function ip_triangle(nip)
     if nip === 3
         ipx,ipw = ip_triangle3()
@@ -37,6 +52,7 @@ end
 ip_triangle(::Val{3}) = ip_triangle3()
 ip_triangle(::Val{6}) = ip_triangle6()
 ip_triangle(::Val{7}) = ip_triangle7()
+
 function ip_triangle3()
     # -- Integration point coordinates
     ipx = @SMatrix [
@@ -155,8 +171,8 @@ function sf_N_tri3(r,s)
     #        |     \
     #        1 - - - 2
     #          r axis -->
-    t       = 1.0-r-s;
-    N = SMatrix{1,3}([t r s]);   # N3 at coordinate (r,s)
+    t = 1.0-r-s;
+    N = @SMatrix [t r s]   # N3 at coordinate (r,s)
     return N
 end 
 
@@ -189,7 +205,7 @@ function sf_N_tri7(r,s)
     #        1 - 4 - 2
     #          r-axis
     t       = 1-r-s
-    N = SMatrix{1,7}([t*(2*t-1)+3*r*s*t r*(2*r-1)+3*r*s*t s*(2*s-1)+3*r*s*t 4*r*t-12*r*s*t 4*r*s-12*r*s*t 4*s*t-12*r*s*t 27*r*s*t]);
+    N = @SMatrix [t*(2*t-1)+3*r*s*t r*(2*r-1)+3*r*s*t s*(2*s-1)+3*r*s*t 4*r*t-12*r*s*t 4*r*s-12*r*s*t 4*s*t-12*r*s*t 27*r*s*t]
 
     return N
 end 
@@ -206,8 +222,8 @@ function sf_dN_tri7(r,s)
     #        1 - 4 - 2
     #          r-axis
     t       = 1-r-s
-    dN= SMatrix{2,7}([1-4*t+3*s*t-3*r*s  -1+4*r+3*s*t-3*r*s  3*s*t-3*r*s        4*t-4*r+12*r*s-12*s*t 4*s+12*r*s-12*s*t -4*s+12*r*s-12*s*t    -27*r*s+27*s*t
-               1-4*t+3*r*t-3*r*s   3*r*t-3*r*s       -1+4*s+3*r*t-3*r*s -4*r-12*r*t+12*r*s     4*r-12*r*t+12*r*s  4*t-4*s-12*r*t+12*r*s 27*r*t-27*r*s])
+    dN= @SMatrix [1-4*t+3*s*t-3*r*s  -1+4*r+3*s*t-3*r*s  3*s*t-3*r*s        4*t-4*r+12*r*s-12*s*t 4*s+12*r*s-12*s*t -4*s+12*r*s-12*s*t    -27*r*s+27*s*t
+               1-4*t+3*r*t-3*r*s   3*r*t-3*r*s       -1+4*s+3*r*t-3*r*s -4*r-12*r*t+12*r*s     4*r-12*r*t+12*r*s  4*t-4*s-12*r*t+12*r*s 27*r*t-27*r*s]
 
     return dN
 end 
@@ -225,7 +241,7 @@ function sf_N_tri6(r,s)
     #
     t = 1.0 - r - s
     # N1 at coordinate (r,s), N2 at coordinate (r,s), etc
-    N = SMatrix{1,6}([t*(2.0*t-1.0)  r*(2.0*r-1.0) s*(2.0*s-1.0) 4.0*r*t 4.0*r*s 4.0*s*t]);
+    N = @SMatrix [t*(2.0*t-1.0)  r*(2.0*r-1.0) s*(2.0*s-1.0) 4.0*r*t 4.0*r*s 4.0*s*t]
     #     dN1       dN2    dN3    dN4       dN5    dN6
 
     return N
@@ -245,8 +261,8 @@ function sf_dN_tri6(r,s)
     t = 1.0 - r - s
     # N1 at coordinate (r,s), N2 at coordinate (r,s), etc
     #     dN1       dN2    dN3    dN4       dN5    dN6
-    dN = SMatrix{2,6}([-(4.0*t-1.0)  4.0*r-1  0.0         4.0*(t-r)  4.0*s   -4.0*s     # w.r.t. r
-               -(4.0*t-1.0)  0.0      4.0*s-1.0  -4.0*r      4.0*r   4.0*(t -s)]); # w.r.t. s
+    dN = @SMatrix [-(4.0*t-1.0)  4.0*r-1  0.0         4.0*(t-r)  4.0*s   -4.0*s     # w.r.t. r
+               -(4.0*t-1.0)  0.0      4.0*s-1.0  -4.0*r      4.0*r   4.0*(t -s)]; # w.r.t. s
 
     return dN
 end 

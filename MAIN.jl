@@ -11,7 +11,7 @@ function main()
         folder = "Anisotropic_1e4_2"
     else
         path = "/home/albert/Desktop/output"
-        folder = "test"
+        folder = "test2"
     end
     filename = "file"
     iplot = Int32(0)
@@ -86,11 +86,12 @@ function main()
     #=========================================================================
         IPs polar coordinates (Some stuff needs to be deprecated)
     =========================================================================#
-    θ6, =  elementcoordinate(GlobC, @views(gr.e2n[1:6, :]))
+    θ6, r6 =  elementcoordinate(GlobC, @views(gr.e2n[1:6, :]))
     θ3 = θStokes 
     fixangles6!(θ6)
     fixangles!(θ3)
-    ipx, ipz = getips(gr.e2n, θStokes, rStokes)
+    ipx, ipz = getips(gr.e2n, θ6, r6 )
+    ix, iz = polar2cartesian(ipx, ipz)
     IntC = [@inbounds(Point2D{Polar}(ipx[i], ipz[i])) for i in CartesianIndices(ipx)] # → ip coordinates
 
     #=========================================================================
@@ -117,7 +118,7 @@ function main()
     init_particle_temperature!(particle_fields, particle_info)
     ΔT = similar(T)
 
-    viscosity_type = "IsoviscousAnisotropic"
+    viscosity_type = "IsoviscousIsotropic"
     #= Options:
         (*) "IsoviscousIsotropic"
         (*) "TemperatureDependantIsotropic"
@@ -262,6 +263,7 @@ function main()
                 to,
             )
 
+
             @timeit to "Particle advenction" begin
                 #=
                 Particle advection and mappings
@@ -281,6 +283,18 @@ function main()
                 # @timeit to "F → particle" particle_fields = F2particle(
                 #     particle_fields, particle_info, ipx, ipz, F
                 # )
+
+                @timeit to "F1 → particle"  p1 = 
+                    @benchmark Fij2particle($p1,
+                                $particle_info,
+                                $particle_weights,
+                                $gr,
+                                $F)
+                                
+                @benchmark p2 = F2particle(
+                    $p2, $particle_info,$ ipx, $ipz, $F
+                )
+
     
                 @timeit to "T → particle" begin
                     interpolate_temperature!(

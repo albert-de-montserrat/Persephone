@@ -74,8 +74,10 @@ end
     Value at nodal coordinates
         w_i_vertex = sum(w_i_ip * N_i_node)
 =========================================================================================#
-function Fij2particle(particle_fields, particle_info, particle_weights, EL2NOD_P1, EL2NOD, F)
+function Fij2particle(particle_fields, particle_info, particle_weights, gr, F)
     
+    EL2NOD_P1, EL2NOD = gr.e2n_p1, gr.e2n
+
     # (1) IP to NODE ----------------------------------------------------------
     # -- Nodal element coordinates
     ξ = [0.0 ,1.0, 0.0]
@@ -123,7 +125,7 @@ function Fij2particle(particle_fields, particle_info, particle_weights, EL2NOD_P
         EL2NOD_P1,
         particle_info,
         particle_weights
-        )
+    )
 
     return particle_fields
 end
@@ -150,10 +152,9 @@ end
 
 function kernel_Fij_particle!(particle_fields, particle_info, ipx, ipz, F, i)
     t = particle_info[i].t_parent
-    idx = [4,6,5]
+    idx = @SVector [4,6,5]
     v = (x=(view(ipx, t, idx)), z=(view(ipz, t, idx))) # Corner ips := [4 6 5]
-    pc = particle_info[i].CPolar
-    N = barycentric_particle(v, pc)
+    N = barycentric_particle(v, particle_info[i].CPolar)
 
     particle_fields.Fxx[i] = dot_F2part(F, t, N, 1, 1, idx)
     particle_fields.Fzx[i] = dot_F2part(F, t, N, 2, 1, idx)
@@ -169,7 +170,7 @@ function F2particle(particle_fields, particle_info, ipx, ipz, F)
     particle_fields
 end
 
-function ip2node(EL2NOD, area_el, F)
+function ip2node(EL2NOD, F)
     # -- Nodal element coordinates
     ξ = Float64.([0,1,0])
     η = Float64.([0,0,1])

@@ -49,21 +49,21 @@ M, V, U, 𝓒, Fxx, Fzz, Fxz, Fzx, a1, a2, vx1, vx2, vy1, vy2 = loader(fname, is
 
 figT = plot_node_black(V.T, gr)
 
-fname = string(path, "FSE_test/",
-        "file_250.h5")
+fname = string("/home/albert/Desktop/output/test/",
+        "file_161.h5")
 
-M, V2, U, 𝓒, Fxx, Fzz, Fxz, Fzx, a1, a2, vx1, vx2, vy1, vy2 = loader(fname, isotropic=false);
-Ael = element_area(gr)
+M, V, U, 𝓒, Fxx, Fzz, Fxz, Fzx, a1, a2, vx1, vx2, vy1, vy2 = loader(fname, isotropic=true);
+# Ael = element_area(gr)
 
 figT = plot_node_black(V.T, gr)
 
 figT = plot_node(U.θ, gr)
 figT = plot_node(V.T, gr)
 
-Fxxn = ip2node(gr.e2n, Ael, Fxx)
-Fzzn = ip2node(gr.e2n, Ael, Fzz)
-Fxzn = ip2node(gr.e2n, Ael, Fxz)
-Fzxn = ip2node(gr.e2n, Ael, Fzx)
+Fxxn = ip2node(gr.e2n, Fxx)
+Fzzn = ip2node(gr.e2n, Fzz)
+Fxzn = ip2node(gr.e2n, Fxz)
+Fzxn = ip2node(gr.e2n, Fzx)
 
 f = plot_node_black(Fxxn, gr)
 f = plot_node_black(Fzzn, gr)
