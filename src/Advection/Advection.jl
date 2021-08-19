@@ -1,6 +1,6 @@
 function step_RK(
     particle_info,
-    EL2NOD_P1,
+    gr,
     particle_weights,
     Ucartesian,
     xp0,
@@ -8,15 +8,20 @@ function step_RK(
     Δt, 
     θThermal, 
     rThermal, 
-    neighbours0, 
     IntC,
     multiplier,
 )
+
+    neighbours, e2n_p1 = gr.neighbours, gr.e2n_p1
+
     # (a) velocity @ particles  
-    particle_info = velocities2particle(particle_info,
-                                        EL2NOD_P1,
-                                        particle_weights,
-                                        Ucartesian)
+    # particle_info = velocities2particle(particle_info,
+    #                                     e2n_p1,
+    #                                     particle_weights,
+    #                                     Ucartesian)
+
+    velocities2particle_cubic!(gr, particle_info, Ucartesian)
+
     # (b) advect particles  
     xp, zp, particle_info = particlesadvection(xp0, zp0, particle_info, Δt, multiplier=multiplier)
     particle_info, particle_weights = 
@@ -24,8 +29,9 @@ function step_RK(
                                     particle_weights, 
                                     θThermal, 
                                     rThermal, 
-                                    neighbours0, 
+                                    neighbours, 
                                     IntC)
+    
     # (c) store particles velocity
     Uxp, Uzp = particle_velocity(particle_info)
 
@@ -48,8 +54,8 @@ function advection_RK2!(Particles, xp0, zp0, Uxp1, Uzp1, Uxp2, Uzp2, Δt)
             Particles[i].CPolar.x -= 2π
         end
         
-       # Fix radius
-       @inbounds if Particles[i].CPolar.z < 1.22
+        # Fix radius
+        @inbounds if Particles[i].CPolar.z < 1.22
             Particles[i].CPolar.z = 1.22001
             Particles[i].CCart.x = polar2x(Particles[i].CPolar)
             Particles[i].CCart.z = polar2z(Particles[i].CPolar)
@@ -63,8 +69,8 @@ function advection_RK2!(Particles, xp0, zp0, Uxp1, Uzp1, Uxp2, Uzp2, Δt)
     end
 end
 
-function advection_RK2(particle_info::Vector{PINFO}, EL2NOD_P1, particle_weights, 
-    Ucartesian, Δt, θThermal, rThermal, neighbours0, IntC, to)
+function advection_RK2(particle_info::Vector{PINFO}, gr, particle_weights, 
+    Ucartesian, Δt, θThermal, rThermal, IntC, to)
     
     # Allocate a couple of buffer arrays
     xp0, zp0 = particle_coordinates(particle_info) # initial particle position
@@ -72,15 +78,14 @@ function advection_RK2(particle_info::Vector{PINFO}, EL2NOD_P1, particle_weights
     # STEP 1 
     xp1, zp1, Uxp1, Uzp1, particle_info, particle_weights = step_RK(
         particle_info,
-        EL2NOD_P1,
+        gr,
         particle_weights,
         Ucartesian,
         xp0,
         zp0, 
         Δt, 
         θThermal, 
-        rThermal, 
-        neighbours0, 
+        rThermal,
         IntC,
         1.0,
     )
@@ -88,7 +93,7 @@ function advection_RK2(particle_info::Vector{PINFO}, EL2NOD_P1, particle_weights
     # STEP 2 
     _, _, Uxp2, Uzp2, particle_info, particle_weights = step_RK(
         particle_info,
-        EL2NOD_P1,
+        gr,
         particle_weights,
         Ucartesian,
         xp1,
@@ -96,7 +101,6 @@ function advection_RK2(particle_info::Vector{PINFO}, EL2NOD_P1, particle_weights
         Δt, 
         θThermal, 
         rThermal, 
-        neighbours0, 
         IntC,
         1.0,
     )
@@ -108,8 +112,8 @@ function advection_RK2(particle_info::Vector{PINFO}, EL2NOD_P1, particle_weights
 end
 
 
-function advection_RK4(particle_info::Vector{PINFO}, EL2NOD_P1, particle_weights, 
-    Ucartesian, Δt, θThermal, rThermal, neighbours0, IntC, to)
+function advection_RK4(particle_info::Vector{PINFO}, gr, particle_weights, 
+    Ucartesian, Δt, θThermal, rThermal, IntC, to)
     
     # Allocate a couple of buffer arrays
     xp0, zp0 = particle_coordinates(particle_info) # initial particle position
@@ -118,15 +122,14 @@ function advection_RK4(particle_info::Vector{PINFO}, EL2NOD_P1, particle_weights
         # STEP 1 
         xp1, zp1, Uxp1, Uzp1, particle_info, particle_weights = step_RK(
             particle_info,
-            EL2NOD_P1,
+            gr,
             particle_weights,
             Ucartesian,
             xp0,
             zp0, 
             Δt, 
             θThermal, 
-            rThermal, 
-            neighbours0, 
+            rThermal,
             IntC,
             0.5,
         )
@@ -134,15 +137,14 @@ function advection_RK4(particle_info::Vector{PINFO}, EL2NOD_P1, particle_weights
         # STEP 2 
         xp2, zp2, Uxp2, Uzp2, particle_info, particle_weights = step_RK(
             particle_info,
-            EL2NOD_P1,
+            gr,
             particle_weights,
             Ucartesian,
-            xp1,
-            zp1, 
+            xp0,
+            zp0, 
             Δt, 
             θThermal, 
-            rThermal, 
-            neighbours0, 
+            rThermal,
             IntC,
             0.5,
         )
@@ -150,32 +152,30 @@ function advection_RK4(particle_info::Vector{PINFO}, EL2NOD_P1, particle_weights
         # STEP 3 
         xp3, zp3, Uxp3, Uzp3, particle_info, particle_weights = step_RK(
             particle_info,
-            EL2NOD_P1,
+            gr,
             particle_weights,
             Ucartesian,
-            xp2,
-            zp2, 
+            xp0,
+            zp0, 
             Δt, 
             θThermal, 
-            rThermal, 
-            neighbours0, 
+            rThermal,
             IntC,
             1.0,
         )
 
         # STEP 4
         _, _, Uxp4, Uzp4, particle_info, particle_weights = step_RK(
-           particle_info,
-           EL2NOD_P1,
-           particle_weights,
-           Ucartesian,
-           xp3,
-           zp3, 
-           Δt, 
-           θThermal, 
-           rThermal, 
-           neighbours0, 
-           IntC,
+            particle_info,
+            gr,
+            particle_weights,
+            Ucartesian,
+            xp0,
+            zp0, 
+            Δt, 
+            θThermal, 
+            rThermal,
+            IntC,
            1.0,
         )
 
@@ -185,6 +185,39 @@ function advection_RK4(particle_info::Vector{PINFO}, EL2NOD_P1, particle_weights
     end
 
     return particle_info, to
+end
+
+
+function advection_RK_step4!(Particles, xp0, zp0, Uxp1, Uzp1, Uxp2, Uzp2, Uxp3, Uzp3, Uxp4, Uzp4, Δt)
+    cte = Δt/6
+    Threads.@threads for i in eachindex(Particles)
+        @inbounds Particles[i].CCart.x = xp0[i] + (Uxp1[i] + 2*(Uxp2[i] + Uxp3[i]) + Uxp4[i])*cte
+        @inbounds Particles[i].CCart.z = zp0[i] + (Uzp1[i] + 2*(Uzp2[i] + Uzp3[i]) + Uzp4[i])*cte
+
+        @inbounds Particles[i].CPolar.x = atan(Particles[i].CCart.x, Particles[i].CCart.z)
+        @inbounds Particles[i].CPolar.z = sqrt(Particles[i].CCart.x^2 + Particles[i].CCart.z^2) 
+
+        # Fix θ
+        @inbounds if Particles[i].CPolar.x < 0
+            Particles[i].CPolar.x += 2π
+            
+        elseif Particles[i].CPolar.x > 2π
+            Particles[i].CPolar.x -= 2π
+        end
+        
+        # Fix radius
+        @inbounds if Particles[i].CPolar.z < 1.22
+            Particles[i].CPolar.z = 1.22001
+            Particles[i].CCart.x = polar2x(Particles[i].CPolar)
+            Particles[i].CCart.z = polar2z(Particles[i].CPolar)
+
+        elseif Particles[i].CPolar.z > 2.22
+            Particles[i].CPolar.z = 2.21999
+            Particles[i].CCart.x = polar2x(Particles[i].CPolar)
+            Particles[i].CCart.z = polar2z(Particles[i].CPolar)
+        end
+
+    end
 end
 
 @inline function velocities2particle(particle_info, e2n_p1, particle_weights, Ucartesian)

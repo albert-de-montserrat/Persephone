@@ -11,7 +11,7 @@ function main()
         folder = "Anisotropic_1e4_2"
     else
         path = "/home/albert/Desktop/output"
-        folder = "test2"
+        folder = "iso4_cubic"
     end
     filename = "file"
     iplot = Int32(0)
@@ -22,7 +22,7 @@ function main()
         MAKE GRID
     =========================================================================#
     split = 2
-    N = 3
+    N = 4
     if split == 1
         nr = Int(1 + 2^N)
         nθ = Int(12 * 2^N)
@@ -30,8 +30,8 @@ function main()
     else
         nr = Int(1+2^N)
         nθ = Int(12*2^N)
-        # nr = Int(1 + 32)
-        # nθ = Int(256)
+        nr = Int(1 + 32)
+        nθ = Int(256)
         gr = Grid(nθ, nr)
     end
     IDs = point_ids(gr)
@@ -138,7 +138,7 @@ function main()
     # η = getviscosity(T, viscosity_type; η=1.81) η=1 is the default
     η = getviscosity(T, viscosity_type, η = 1)
     Valη = Val(η)
-    g = 1e5
+    g = 1e4
     𝓒 = anisotropic_tensor(FSE, D, Valη, ipx)
 
     #=========================================================================
@@ -263,7 +263,6 @@ function main()
                 to,
             )
 
-
             @timeit to "Particle advenction" begin
                 #=
                 Particle advection and mappings
@@ -276,25 +275,12 @@ function main()
                        Fij2particle(particle_fields,
                                     particle_info,
                                     particle_weights,
-                                    gr.e2n_p1,
-                                    gr.e2n,
+                                    gr,
                                     F)
 
                 # @timeit to "F → particle" particle_fields = F2particle(
                 #     particle_fields, particle_info, ipx, ipz, F
                 # )
-
-                @timeit to "F1 → particle"  p1 = 
-                    @benchmark Fij2particle($p1,
-                                $particle_info,
-                                $particle_weights,
-                                $gr,
-                                $F)
-                                
-                @benchmark p2 = F2particle(
-                    $p2, $particle_info,$ ipx, $ipz, $F
-                )
-
     
                 @timeit to "T → particle" begin
                     interpolate_temperature!(
@@ -316,13 +302,12 @@ function main()
 
                 @timeit to "advection" particle_info, to = advection_RK2(
                     particle_info,
-                    gr.e2n_p1,
+                    gr,
                     particle_weights,
                     Ucartesian,
                     Δt,
                     θThermal,
                     rThermal,
-                    gr.neighbours,
                     IntC,
                     to,
                 )
@@ -337,13 +322,17 @@ function main()
                 )
 
                 lost_particles = length(particle_info) - sum(found)
-                println("Lost particles: ", lost_particles)
+
+                check_corruption!(found, particle_fields)
+
+                println("Lost particles: ", lost_particles, " Corrupted particles: ",  length(particle_info) - sum(found) -lost_particles)
 
                 if lost_particles > 0
                     particle_info, particle_weights, particle_fields = purgeparticles(
                         particle_info, particle_weights, particle_fields, found
                     )
                 end
+
             end
 
             @timeit to "Particle to node/ip" begin
@@ -384,7 +373,7 @@ function main()
 
             println("mean T after advection  ", mean(T))
 
-            @timeit to "Run stats" write_stats(U, T, gr, Time, ScratchNu, stats_file)
+            @timeit to "Run stats" write_stats(U, T, length(particle_info), gr, Time, ScratchNu, stats_file)
 
             Time += Δt
             show(to; compact=true)

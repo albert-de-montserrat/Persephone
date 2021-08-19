@@ -244,15 +244,49 @@ end ### END barycentric_coordinates FUNCTION ###################################
 
 end ### END barycentric_coordinates FUNCTION ###################################
 
+function check_corruption!(found, particle_fields)
+    np = length(particle_fields.T)
+    Threads.@threads for i in 1:np 
+        @inbounds if isinf(particle_fields.T[i])   ||
+           isinf(particle_fields.Fxx[i]) ||
+           isinf(particle_fields.Fxz[i]) ||
+           isinf(particle_fields.Fzx[i]) ||
+           isinf(particle_fields.Fzz[i]) ||
+           isnan(particle_fields.T[i])   ||
+           isnan(particle_fields.Fxx[i]) ||
+           isnan(particle_fields.Fxz[i]) ||
+           isnan(particle_fields.Fzx[i]) ||
+           isnan(particle_fields.Fzz[i])
+
+           found[i] = false
+        end
+    end
+end
+
 function purgeparticles(particle_info, particle_weights, particle_fields, found)
     ikeep = findall(found)
     particle_info = [@inbounds particle_info[i] for i in ikeep]
     particle_weights = [@inbounds particle_weights[i] for i in ikeep]
-    particle_fields.T = [@inbounds particle_fields.T[i] for i in ikeep]    
-    particle_fields.Fxx = [@inbounds particle_fields.Fxx[i] for i in ikeep]    
-    particle_fields.Fzz = [@inbounds particle_fields.Fzz[i] for i in ikeep]    
-    particle_fields.Fxz = [@inbounds particle_fields.Fxz[i] for i in ikeep]    
-    particle_fields.Fzx = [@inbounds particle_fields.Fzx[i] for i in ikeep]    
+
+    T = Vector{Float64}(undef, sum(ikeep))
+    Fxx, Fzz, Fxz, Fzx = similar(T), similar(T), similar(T), similar(T)
+    Threads.@threads for i in eachindex(T)
+        @inbounds T[i] = particle_fields.T[i]
+        @inbounds Fxx[i] = particle_fields.Fxx[i]
+        @inbounds Fzz[i] = particle_fields.Fzz[i]
+        @inbounds Fxz[i] = particle_fields.Fxz[i]
+        @inbounds Fzx[i] = particle_fields.Fzx[i]
+    end
+    particle_fields.T = T
+    particle_fields.Fxx = Fxx
+    particle_fields.Fzz = Fzz
+    particle_fields.Fxz = Fxz
+    particle_fields.Fzx = Fzx
+    # particle_fields.T = [@inbounds particle_fields.T[i] for i in ikeep]    
+    # particle_fields.Fxx = [@inbounds particle_fields.Fxx[i] for i in ikeep]    
+    # particle_fields.Fzz = [@inbounds particle_fields.Fzz[i] for i in ikeep]    
+    # particle_fields.Fxz = [@inbounds particle_fields.Fxz[i] for i in ikeep]    
+    # particle_fields.Fzx = [@inbounds particle_fields.Fzx[i] for i in ikeep]    
 
     return particle_info, particle_weights,particle_fields
 end

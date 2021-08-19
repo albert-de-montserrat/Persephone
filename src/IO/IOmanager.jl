@@ -186,8 +186,6 @@ function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, EL2NOD, Glob
     end
 end
 
-
-
 function reloader(fname)
     fid = h5open(fname,"r")
 
@@ -204,7 +202,19 @@ function reloader(fname)
     return T, F
 end
 
-function write_stats(U, T, gr, Time, ScratchNu, stats_file)
+
+function load_particles(fname)
+    fid = h5open(fname,"r")
+
+    # -- Load fields
+    V = fid["PART"]
+    px = read(V,"x")
+    pz = read(V,"z")
+
+    return px, pz
+end
+
+function write_stats(U, T, np, gr, Time, ScratchNu, stats_file)
     # V = ones(size(S))
     # A = volume_integral_cartesian(V, gr) # total area
     r_in, r_out = 1.22, 2.22
@@ -221,10 +231,10 @@ function write_stats(U, T, gr, Time, ScratchNu, stats_file)
     Nu_bot = ScratchNu.A * ScratchNu.Δθ * sum(∇T_bot) * r_in
 
     open(stats_file, "a") do io
-        println(io, Float32(Time), " ", Float32(Urms), " ", Float32(Tav), " ", Float32(Nu_top), " ", Float32(Nu_bot))
+        println(io, Float32(Time), " ", Float32(Urms), " ", Float32(Tav), " ", Float32(Nu_top), " ", Float32(Nu_bot), " ", np)
     end
 
-    println("Urms = ", Urms, " ⟨T⟩ = ", Tav, " Nusselt top =", Nu_top, " Nusselt bot =", Nu_bot)
+    println("Urms = ", Urms, " ⟨T⟩ = ", Tav, " Nusselt top =", Nu_top, " Nusselt bot =", Nu_bot, " #particles =", np)
 end
 
 struct Nusselt{T,N}

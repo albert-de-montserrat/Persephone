@@ -33,36 +33,15 @@ end
     # Coordinates of query point
     x, z = pc.x, pc.z
 
-    denom = -x1*z3 + x1*z2 - x2*z1 + z2*z3 + x3*z1 - x3*z2
+    denom = -x1*z3 + x1*z2 - x2*z1 + x2*z3 + x3*z1 - x3*z2
     
-    λ2 = (-( -x1*z + x1*z3 - x3*z1 + x*z1 +x3*z -x*z3 ) ) /
+    λ2 = -( -x1*z + x1*z3 - x3*z1 + x*z1 +x3*z -x*z3 )/
           denom
 
     λ3 = (x1*z2 - x1*z - x2*z1 + x2*z + x*z1 -x*z2) /
           denom
         
-    λ1 = 1 - (λ3+λ3)
-
-    return @SVector [λ1, λ2, λ3]
-
-end 
-
-@inline function local_coordinates(vc::SMatrix{3, 2, Float64, 6}, pc::Point2D{T}) where {T}
-    # Coordinates of triangle's vertices
-    x1,x2,x3 = vc[1,1], vc[2,1], vc[3,1]
-    z1,z2,z3 = vc[1,2], vc[2,2], vc[3,2]
-    # Coordinates of query point
-    x, z = pc.x, pc.z
-
-    denom = -x1*z3 + x1*z2 - x2*z1 + z2*z3 + x3*z1 - x3*z2
-    
-    λ2 = (-( -x1*z + x1*z3 - x3*z1 + x*z1 +x3*z -x*z3 ) ) /
-          denom
-
-    λ3 = (x1*z2 - x1*z - x2*z1 + x2*z + x*z1 -x*z2) /
-          denom
-        
-    λ1 = 1 - (λ3+λ3)
+    λ1 = 1 - (λ3+λ2)
 
     return @SVector [λ1, λ2, λ3]
 
@@ -95,12 +74,14 @@ end
 end
 
 function local_derivatives(gr::Grid, vc, field, iel)
-    EL2NOD = gr.e2n_p1
-    x_el, z_el = @views (gr.θ[EL2NOD[1:3, iel]]),  @views (gr.r[EL2NOD[1:3, iel]])
-    vertices!(vc, x_el, z_el)
+    # unpacks
+    e2n = gr.e2n_p1
+    θ, r = gr.x, gr.z
+    # cache indices 
+    idx = @views e2n[:, iel]
+    x_el, z_el = @views (θ[idx]),  @views (r[idx])
 
-    Mx = @SVector [vc[i].x for i in 1:3]
-    My = @SVector [vc[i].z for i in 1:3]
+    vertices!(vc, x_el, z_el)
 
     ω = local_weights(vc) # weights 
 
@@ -113,7 +94,7 @@ function local_derivatives(gr::Grid, vc, field, iel)
                       (vc[1].x - vc[3].x)*invdetM,
                       (vc[2].x - vc[1].x)*invdetM] 
 
-    B = @views field[EL2NOD[1:3, iel]]
+    B = @views field[idx]
     dBdx = mydot(B, invMx)
     dBdz = mydot(B, invMz)
 
@@ -122,15 +103,16 @@ end
 
 
 function element_derivatives(gr, vc, fields)
-    nnod = maximum(gr.e2n_p1)
-    nels = size(gr.e2n_p1,2)
+    e2n_p1 = gr.e2n_p1
+    nnod = maximum(e2n_p1)
+    nels = size(e2n_p1,2)
     dBdx_nod = zeros(nnod)
     dBdz_nod = zeros(nnod)
-    dBdx_el = zeros(nels)
-    dBdz_el = zeros(nels)
     ω_nod = zeros(nnod)
+    dBdx_el = Vector{Float64}(undef, nels)
+    dBdz_el = similar(dBdx_el)
 
-    for iel in 1:nels
+    @inbounds for iel in 1:nels
         dBdx_ipart, dBdz_ipart, ω = local_derivatives(gr, vc, fields, iel)
         
         dBdx_el[iel] = dBdx_ipart
@@ -138,18 +120,22 @@ function element_derivatives(gr, vc, fields)
         
         # reduction over nodes
         @inbounds for i in 1:3
-            el_nod = gr.e2n_p1[i, iel]
+            el_nod = e2n_p1[i, iel]
             dBdx_nod[el_nod] += dBdx_ipart*ω[i]
             dBdz_nod[el_nod] += dBdz_ipart*ω[i]
             ω_nod[el_nod] += ω[i]
         end
+
     end
 
-    dBdx_nod ./= ω_nod
-    dBdz_nod ./= ω_nod
+    dBdx, dBdz = similar(dBdx_nod), similar(dBdx_nod)
+    @turbo for i in eachindex(dBdx)
+        dBdx[i] = dBdx_nod[i]/ω_nod[i]
+        dBdz[i] = dBdz_nod[i]/ω_nod[i]
+    end    
 
-    dBdx_el2nod = view(dBdx_nod, gr.e2n_p1) .- dBdx_el' # remove background slope x
-    dBdz_el2nod = view(dBdz_nod, gr.e2n_p1) .- dBdz_el' # remove background slope z
+    dBdx_el2nod = view(dBdx, e2n_p1) .- dBdx_el' # remove background slope x
+    dBdz_el2nod = view(dBdz, e2n_p1) .- dBdz_el' # remove background slope z
 
     return dBdx_el2nod, dBdz_el2nod
 end
@@ -157,12 +143,12 @@ end
 function slope(gr, dBdx_el2nod, dBdz_el2nod, nels)
     slope_info = Array{Float64,2}(undef, 6, nels)
     sqrthalf = √0.5
-    @inbounds for i in axes(slope_info, 2)
-        idx = gr.e2n_p1[:,i]
-        x_el, z_el = @views (gr.θ[idx]),  @views (gr.r[idx])
+    @inbounds for i in 1:nels
+        idx = @views gr.e2n_p1[:,i]
+        x_el, z_el = @views (gr.x[idx]),  @views (gr.z[idx])
         c1x = -x_el[1] + x_el[2]
-        c2x = -z_el[1] + z_el[2]
         c1z = -x_el[1] + x_el[3]
+        c2x = -z_el[1] + z_el[2]
         c2z = -z_el[1] + z_el[3]
 
         slope_xi1 = c1x * dBdx_el2nod[1, i] + c2x.* dBdz_el2nod[1, i]
@@ -186,11 +172,10 @@ function slope(gr, dBdx_el2nod, dBdz_el2nod, nels)
 end
 
 function cubic_particle_interpolation!(fields_particles, particle_info, slope_info, gr, fields, vc)
-    @inbounds for (i, info) in  enumerate(particle_info)
+    for (i,info) in  enumerate(particle_info)
         iel = info.t
-        pc = info.CPolar
-        idx = gr.e2n_p1[:,i]
-        x_el, z_el = @views (gr.θ[idx]),  @views (gr.r[idx])
+        pc = info.CCart
+        x_el, z_el = @views (gr.x[gr.e2n_p1[:,iel]]),  @views (gr.z[gr.e2n_p1[:,iel]])
         els = view(gr.e2n_p1, :, iel)
 
         # compute shape functions 
@@ -198,7 +183,7 @@ function cubic_particle_interpolation!(fields_particles, particle_info, slope_in
         λ = local_coordinates(vc, pc)
         N = quasicubic_SF(λ)
 
-        # interpolate field to particle 
+        # # interpolate field to particle 
         Fel = view(fields, els)
         slope_info_part = view(slope_info, :, iel)
 
@@ -221,10 +206,11 @@ function vertices!(v::Array{Point2D{T},1}, x, z) where {T}
 end
 
 function quasicubic_interpolation(gr, particle_info, fields)
+    
     np = length(particle_info)
     nels = size(gr.e2n_p1,2)
   
-    vc = [Point2D{Polar}(0.0, 0.0) for i=1:3] # allocate element vertices
+    vc = [Point2D{Cartesian}(0.0, 0.0) for _  in 1:3] # element vertices
 
     dBdx_el2nod, dBdz_el2nod = element_derivatives(gr, vc, fields)
     

@@ -169,13 +169,15 @@ mynorm(r::Vector) = sqrt(mydot(r,r))
 
 function mydot(a::AbstractArray{T}, b::AbstractArray{T}) where {T}
     n = zero(T)
-    if size(a,2) != 1
-        a = a'
+    @turbo for i in eachindex(a)
+        n += a[i]*b[i]
     end
-    if size(b,2) != 1
-        b = b'
-    end
-    @turbo for i in axes(a,1)
+    n
+end
+
+function mydot(a, b) where {T}
+    n = zero(eltype(a))
+    @turbo for i in eachindex(a)
         n += a[i]*b[i]
     end
     n

@@ -80,16 +80,16 @@ function Fij2particle(particle_fields, particle_info, particle_weights, gr, F)
 
     # (1) IP to NODE ----------------------------------------------------------
     # -- Nodal element coordinates
-    ξ = [0.0 ,1.0, 0.0]
-    η = [0.0 ,0.0, 1.0]
+    ξ = @SVector [0.0, 1.0, 0.0]
+    η = @SVector [0.0, 0.0, 1.0]
 
     # -- Transformation to ip triangular element coordinates
-    ξv = @. 2.0*ξ - 1.0/3.0
-    ηv = @. 2.0*η - 1.0/3.0
+    ξv = @. 2*ξ - 1/3
+    ηv = @. 2*η - 1/3
 
     # -- Shape functions
     nn3 = Val(3)
-    NN, _ = shape_functions_triangles([ξv ηv],nn3)
+    NN, _ = shape_functions_triangles(hcat(ξv, ηv),nn3)
     
     # -- Map from integration points to the 6 element nodes 
     m, n = size(F)
@@ -780,7 +780,6 @@ end
 
 @inline fw(x) = x^3 * exp(-3*x)
 
-# @inline weightednode2particle(A,ω) = (ω[1]*A[1] + ω[2]*A[2] + ω[3]*A[3]) / (ω[1]+ω[2]+ω[3])
 
 @inline function weightednode2particle(A, ω)
     a, b = 0.0, 0.0
@@ -796,4 +795,17 @@ function T2particle_cubic!(particle_fields, gr, T, particle_info)
     Threads.@threads for i in axes(Tp,1)
         @inbounds particle_fields.T[i] = max(min(Tp[i], 1.0), 0.0)
     end
+end
+
+function velocities2particle_cubic!(gr, particle_info, U)
+    Ux0, Uz0 = getvelocity(U)
+
+    Uxp = quasicubic_interpolation(gr, particle_info, Ux0)
+    Uzp = quasicubic_interpolation(gr, particle_info, Uz0)
+
+    Threads.@threads for i in axes(particle_info,1)
+        @inbounds particle_info[i].UCart.x = Uxp[i]
+        @inbounds particle_info[i].UCart.z = Uzp[i]
+    end
+
 end

@@ -60,7 +60,7 @@ function color_mesh(EL2NOD)
         @inbounds push!(color_list[color],iel)
     end   
 
-    return els_colors, color_list
+    return els_colors, sort!(color_list)
 end
 
 ## Make list of elements sharing i-th node 
