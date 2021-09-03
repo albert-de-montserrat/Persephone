@@ -1,5 +1,5 @@
 # Out-of-place C = A*B
-function gemm(A::AbstractMatrix, B::AbstractMatrix)
+@inline function gemm(A::AbstractMatrix, B::AbstractMatrix)
     m, n, p = size(A,1), size(B,2), size(A,2)
 
     C = Matrix{eltype(A)}(undef, m, n)
@@ -16,7 +16,7 @@ function gemm(A::AbstractMatrix, B::AbstractMatrix)
 end 
 
 # threaded version of vectorized gemm
-function gemmt(A::AbstractMatrix, B::AbstractMatrix)
+@inline function gemmt(A::AbstractMatrix, B::AbstractMatrix)
     m, n, p = size(A,1), size(B,2), size(A,2)
 
     C = Matrix{eltype(A)}(undef, m, n)
@@ -33,7 +33,7 @@ function gemmt(A::AbstractMatrix, B::AbstractMatrix)
 end 
 
 # In-place C = A*B
-function gemm!(C::AbstractArray{T},A::AbstractArray{T},B::AbstractArray{T}) where T
+@inline function gemm!(C::AbstractArray{T},A::AbstractArray{T},B::AbstractArray{T}) where T
     
     m, n, p = size(A,1), size(B,2), size(A,2)
     @turbo for i in 1:m, k in 1:n
@@ -45,7 +45,7 @@ function gemm!(C::AbstractArray{T},A::AbstractArray{T},B::AbstractArray{T}) wher
     end
 end 
 
-function gemmt!(C::AbstractArray{T},A::AbstractArray{T},B::AbstractArray{T}) where T
+@inline function gemmt!(C::AbstractArray{T},A::AbstractArray{T},B::AbstractArray{T}) where T
     
     m, n, p = size(A,1), size(B,2), size(A,2)
     @tturbo for i in 1:m, k in 1:n
@@ -56,3 +56,21 @@ function gemmt!(C::AbstractArray{T},A::AbstractArray{T},B::AbstractArray{T}) whe
         C[i,k] = aux
     end
 end 
+
+mynorm(r::Vector) = sqrt(mydot(r,r))
+
+function mydot(a::AbstractArray{T}, b::AbstractArray{T}) where {T}
+    n = zero(T)
+    @turbo warn_check_args=false for i in eachindex(a)
+        n += a[i]*b[i]
+    end
+    n
+end
+
+function mydot(a, b) where {T}
+    n = zero(eltype(a))
+    @turbo for i in eachindex(a)
+        n += a[i]*b[i]
+    end
+    n
+end

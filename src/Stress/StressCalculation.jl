@@ -1,14 +1,12 @@
-# abstract type Tensor2D end
-
 struct SymmetricTensor{T} 
-    xx::Array{T,2}
-    zz::Array{T,2}
-    xz::Array{T,2}
+    xx::Matrix{T}
+    zz::Matrix{T}
+    xz::Matrix{T}
 end
 
 struct Gradient{T}
-    ∂x::Array{T,2}
-    ∂z::Array{T,2}
+    ∂x::Matrix{T}
+    ∂z::Matrix{T}
 end
 
 function initstress(nel)
@@ -21,13 +19,7 @@ function initstress(nel)
 end
 
 function stress(U, T, F, 𝓒, τ, ε, EL2NOD, theta, r, η, PhaseID, Δt)
-    # ============================================ SCALE Velocity
-    # ρ0 = 3300
-    # Cp = 1220
-    # κ  = 3
-    # L = 2900e3
-    # scaling = 1e-6/2890e3
-    Uscaled = U.*1
+    Uscaled = U
 
     # ============================================ MODEL AND BLOCKING PARAMETERS
     ndim = 2

@@ -144,18 +144,15 @@ end
     return d
 end
 
-@inline distance(p1::Point2D{Polar},p2::NamedTuple) = √( p1.z^2 + p2.z^2 - 2p1.z*p2.z*cos(p1.x-p2.x))
-
-@inline distance(p1::Point2D{Polar},p2::Point2D{Polar}) = √( p1.z^2 + p2.z^2 - 2p1.z*p2.z*cos(p1.x-p2.x))
-
 @inline distance(p1::Point2D{Cartesian},p2::Point2D{Cartesian}) = √((p1.x - p2.x)^2 + (p1.z - p2.z)^2)
+
+@inline distance(p1::Point2D{Polar},p2::Point2D{Polar}) = distance(polar2cartesian(p1), polar2cartesian(p2))
+
+@inline distance(p1::Point2D{Polar},p2::NamedTuple) = distance(polar2cartesian(p1), polar2cartesian(p2))
 
 @inline distance(p1::Point2D{Cartesian},p2::NamedTuple) = √((p1.x - p2.x)^2 + (p1.z - p2.z)^2)
 
 @inline distance(x1::T, z1::T, x2::T, z2::T) where {T<:Real} = √((x1-x2)^2 + (z1-z2)^2)
-
-@inline getcentroid(p1::Point2D{Cartesian},p2::Point2D{Cartesian},p3::Point2D{Cartesian}) = 
-    Point2D{Cartesian}((p1.x+p2.x+p3.x)/3,(p1.z+p2.z+p3.z)/3)
 
 @inline getcentroid(p1::Point2D{Cartesian},p2::Point2D{Cartesian},p3::Point2D{Cartesian}) = 
     Point2D{Cartesian}((p1.x+p2.x+p3.x)/3,(p1.z+p2.z+p3.z)/3)
@@ -268,20 +265,15 @@ function purgeparticles(particle_info, particle_weights, particle_fields, found)
     particle_info = [@inbounds particle_info[i] for i in ikeep]
     particle_weights = [@inbounds particle_weights[i] for i in ikeep]
 
-    T = Vector{Float64}(undef, sum(ikeep))
-    Fxx, Fzz, Fxz, Fzx = similar(T), similar(T), similar(T), similar(T)
     Threads.@threads for i in eachindex(T)
-        @inbounds T[i] = particle_fields.T[i]
-        @inbounds Fxx[i] = particle_fields.Fxx[i]
-        @inbounds Fzz[i] = particle_fields.Fzz[i]
-        @inbounds Fxz[i] = particle_fields.Fxz[i]
-        @inbounds Fzx[i] = particle_fields.Fzx[i]
+        if ikeep==false
+            popat!(particle_fields.T, i)
+            popat!(particle_fields.Fxx, i)
+            popat!(particle_fields.Fzz, i)
+            popat!(particle_fields.Fxz, i)
+            popat!(particle_fields.Fzx, i)
+        end
     end
-    particle_fields.T = T
-    particle_fields.Fxx = Fxx
-    particle_fields.Fzz = Fzz
-    particle_fields.Fxz = Fxz
-    particle_fields.Fzx = Fzx
     # particle_fields.T = [@inbounds particle_fields.T[i] for i in ikeep]    
     # particle_fields.Fxx = [@inbounds particle_fields.Fxx[i] for i in ikeep]    
     # particle_fields.Fzz = [@inbounds particle_fields.Fzz[i] for i in ikeep]    
@@ -370,7 +362,7 @@ end
     PC
 end
 
-function addreject(T, F, gr, θThermal, rThermal, IC, particle_info, particle_weights, particle_fields)
+function addreject(T, F, gr, θThermal, rThermal, IC, particle_info, particle_weights, particle_fields; min_num_particles = 8)
     
     e2n, e2n_p1, neighbours0 = gr.e2n, gr.e2n_p1, gr.neighbours
     
@@ -378,7 +370,7 @@ function addreject(T, F, gr, θThermal, rThermal, IC, particle_info, particle_we
     vertices = [Point2D{Polar}(rand(),rand()) for _ in 1:3] # element vertices 
     t0 = [particle_info[i].t for i in axes(particle_info,1)]
 
-    max_ppel, min_ppel = 15, 8
+    max_ppel, min_ppel = 15, min_num_particles
 
     # --- Find number of particles per element    
     reps, irem = getreps(t0, nel, max_ppel)
@@ -506,13 +498,13 @@ end ### END add_reject FUNCTION ################################################
     Point2D{Polar}(x,z)
 end
 
-function particles_generator(θ3, r3, IntC, e2n_p1)
+function particles_generator(θ3, r3, IntC, e2n_p1; number_of_particles = 12)
 
     color           = zeros(3)
     vertices        = [Point2D{Polar}(rand(),rand()) for _ in 1:3] # element vertices 
     particle_info   = PINFO[]    
     particle_weights= PWEIGHTS[]   
-    nrand           = 25
+    nrand           = number_of_particles
     # bary_coords     = Vector{Float64}(undef,3)
     node_weights    = zeros(3)
     ip_weights      = similar(node_weights)
@@ -832,53 +824,11 @@ function direct_tsearch(particle_info, particle_weights, gr, IntC, ScratchSearch
 
 end
 
-# scatter(gr.θ[gr.e2n[1:3,iparent]], gr.r[gr.e2n[1:3,iparent]])
-# scatter!([pc.x],[pc.z],color=:red)
-
 function tsearch(particle_info, particle_weights, gr, IntC, ScratchSearch::Tsearch{Float64, Int64}, θThermal, rThermal)
     Threads.@threads for ipart in axes(particle_info,1)
         direct_tsearch(particle_info, particle_weights, gr, IntC, ScratchSearch, θThermal, rThermal, ipart);
     end
     return particle_info, particle_weights
-end
-
-function tsearch_parallel2(particle_info, particle_weights, θThermal, rThermal, neighbours0, IntC)
-    np = length(particle_info) # num of particles 
-    found = fill(false, np) # true if particle found in same element as in previous t-step
-    # xp = [zeros(3)  for _ in 1:Threads.nthreads()] # buffer 
-    vertices = [[Point2D{Polar}(0.0, 0.0) for _ in 1:3] for _ in 1:Threads.nthreads()] # element vertices 
-
-    blk_size = 800
-    # nt = Threads.nthreads()
-    nblk = div(np,blk_size)
-    last_blk = (np-rem(np,blk_size)+1):np
-    
-    # Find particles who remain within same old triangular element
-    Threads.@threads for ib in 1:nblk-1
-        @inbounds for ipart in (1+blk_size*(ib-1)) : blk_size*ib
-            # check if particle is in the same triangle as in previous time step i.e. found = true
-            isinparent!(particle_info, θThermal, rThermal, vertices, found, ipart)
-            if found[ipart] == false
-                # check neighbour that contains new position of the particle
-                isinneighbours!(particle_info, θThermal, rThermal, vertices, ipart, found, neighbours0)
-            end
-            # fill weights information
-            fillparticle!(particle_weights, particle_info, vertices, IntC, θThermal, rThermal, ipart)
-        end
-    end
-
-    for ipart in last_blk
-        # check if particle is in the same triangle as in previous time step i.e. found = true
-        isinparent!(particle_info, θThermal, rThermal, vertices, found, ipart)
-        @inbounds if found[ipart] == false
-            # check neighbour that contains new position of the particle
-            isinneighbours!(particle_info, θThermal, rThermal, vertices, ipart, found, neighbours0)
-        end
-        # fill weights information
-        fillparticle!(particle_weights, particle_info, vertices, IntC, θThermal, rThermal, ipart)
-    end
-    
-    return particle_info, particle_weights, found
 end
 
 function tsearch_single_particle(particle_info, particle_weights, θThermal, rThermal, neighbours0, IntC, ipart)

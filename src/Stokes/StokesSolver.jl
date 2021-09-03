@@ -1,12 +1,3 @@
-
-abstract type Cartesian end
-abstract type Polar end
-
-mutable struct Point2D{T}
-    x::Float64
-    z::Float64
-end
-
 # ==================================================================================================================
 function solveStokes(U, P, gr, Ucartesian,Upolar, g, ρ, η, 𝓒,
     coordinates, TT,

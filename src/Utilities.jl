@@ -31,8 +31,8 @@ end
 
 function elementcoordinate(GlobC,e2n)
     m,n = size(e2n)
-    x = Array{Float64,2}(undef,m,n)
-    z = Array{Float64,2}(undef,m,n)
+    x = Matrix{Float64}(undef,m,n)
+    z = Matrix{Float64}(undef,m,n)
     @inbounds for j in 1:n
         idx = view(e2n,:,j)
         for i in 1:m
@@ -59,22 +59,12 @@ function fixangles!(x)
                     x[k,j] += 2π
                 end
             end
-            # if v1 < π
-            #     x[1,j] += 2π
-            # end
-            # if v2 < π
-            #     x[2,j] += 2π
-            # end
-            # if v3 < π
-            #     x[3,j] += 2π
-            # end
         end
     end
 end
 
 function fixangles6!(x)
     @inbounds for j in axes(x,2)
-        # v1,v2,v3 = x[1,j],x[2,j],x[3,j]
         v = ntuple(i->x[i,j],6)
         a1 = abs(v[1] - v[2])
         a2 = abs(v[2] - v[3])
@@ -94,16 +84,16 @@ getspeed(A::Point2D{Cartesian}) = √(A.x^2 + A.z^2)
 
 getspeed(x::Real, z::Real) = √(x^2 + z^2)
 
-function calculate_Δt(Ucartesian, nθ, min_inradius)
-    # C = 0.1 # Courant number
-    # r = 1.22 # inner radius
-    # velocity = maximum(getspeed.(Ucartesian))
-    # dx_limit = 2π*r/nθ/4
-    # dt_adv = dx_limit / velocity * C
-    # min(dt_adv, 1.0)
+# function calculate_Δt(Ucartesian, nθ, min_inradius)
+#     # C = 0.1 # Courant number
+#     # r = 1.22 # inner radius
+#     # velocity = maximum(getspeed.(Ucartesian))
+#     # dx_limit = 2π*r/nθ/4
+#     # dt_adv = dx_limit / velocity * C
+#     # min(dt_adv, 1.0)
 
-    min_inradius/maximum(getspeed.(Ucartesian))
-end
+#     min_inradius/maximum(getspeed.(Ucartesian))
+# end
 
 calculate_Δt(Ucartesian, nθ, min_inradius) = min_inradius/maximum(getspeed.(Ucartesian))
 
@@ -146,7 +136,7 @@ function getips(EL2NOD, θ, r)
     nel = size(EL2NOD,2)
     nip = 6
     ni, nn  = Val(nip), Val(nnodel)
-    N, dNds, ~, w_ip = _get_SF(ni,nn)
+    N, dNds, _, w_ip = _get_SF(ni,nn)
 
     θip = Array{Float64,2}(undef, nel, nip)
     rip = similar(θip)
@@ -164,31 +154,3 @@ function getips(EL2NOD, θ, r)
 
     return θip, rip
 end
-
-mynorm(r::Vector) = sqrt(mydot(r,r))
-
-function mydot(a::AbstractArray{T}, b::AbstractArray{T}) where {T}
-    n = zero(T)
-    @turbo for i in eachindex(a)
-        n += a[i]*b[i]
-    end
-    n
-end
-
-function mydot(a, b) where {T}
-    n = zero(eltype(a))
-    @turbo for i in eachindex(a)
-        n += a[i]*b[i]
-    end
-    n
-end
-
-# function ismember(v, b)
-#     tnb = Int[]
-#     Threads.@threads for i in axes(v,1)
-#         @inbounds if v[i] ∈ b
-#             push!(tnb, i)
-#         end
-#     end
-#     tnb
-# end

@@ -2,9 +2,9 @@
 # During threaded assembly each thread acts upon a single color. In this way, we 
 # can multithread along each color avoiding synchronisations between threads. It 
 # could be extended amongst different cpus, where each cpu takes different colors
-function color_mesh(EL2NOD)
+function color_mesh(e2n)
     ## ---- Make list of elements within i-th node 
-    els = view(EL2NOD,1:3,:) 
+    els = view(e2n,1:3,:) 
     nel = size(els,2)
     els_in_node = elements_in_node(els)
     
@@ -23,10 +23,10 @@ function color_mesh(EL2NOD)
     end
     incidence_matrix = sparse(I, J, V)
 
-    ## ---- Fill elemental color matrix
+    ##  Fill elemental color matrix
     els_colors = fill(0,nel)
     max_color = 0
-    for iel in 1:nel
+    @inbounds for iel in 1:nel
         occupied_color = Int64[]
 
         for r in nzrange(incidence_matrix, iel)
@@ -53,7 +53,7 @@ function color_mesh(EL2NOD)
         els_colors[iel] = free_color
     end
 
-    ## ---- List of elements per color (this is what is needed for threading the assembler)
+    ## List of elements per color (this is what is needed for threading the assembler)
     # max_color -= 1
     color_list = [Int32[] for _ in 1:max_color]
     for (iel, color) in enumerate(els_colors)
@@ -76,24 +76,24 @@ end
 # Make vtk file of colored grid (WriteVTK pagkage)
 function colored_grid_vtk(colors,M)
     cells = [MeshCell(VTKCellTypes.VTK_TRIANGLE, M.e2n[i,1:3]) for i in axes(M.e2n,1)]
-    vtkfile = vtk_grid("colored_grid", M.x, M.z, cells)  # 2D
+    vtkfile = vtk_grid("colored_grid", M.x, M.z, cells)
     vtkfile["color", VTKCellData()] = colors
     vtk_save(vtkfile)
 end
 
 # Make vtk file of colored grid
-function colored_grid_vtk(colors, x, z, EL2NOD)
-    cells = [MeshCell(VTKCellTypes.VTK_TRIANGLE, EL2NOD[i,1:3]) for i in axes(EL2NOD,1)]
-    vtkfile = vtk_grid("colored_grid", x, z, cells)  # 2D
+function colored_grid_vtk(colors, x, z, e2n)
+    cells = [MeshCell(VTKCellTypes.VTK_TRIANGLE, e2n[i,1:3]) for i in axes(e2n,1)]
+    vtkfile = vtk_grid("colored_grid", x, z, cells)
     vtkfile["color", VTKCellData()] = colors
     vtk_save(vtkfile)
 end
 
-"""
-check_colored_mesh(color_list)
+#=
+    check_colored_mesh(color_list)
 
-Checks if coloring was succesfull
-"""
+    Checks whether coloring was succesfull
+=#
 function check_colored_mesh(color_list)
     ncolors = length(color_list)
     

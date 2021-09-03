@@ -1,10 +1,3 @@
-
-
-struct ElementCoordinates{T}
-    θ::Matrix{T}
-    r::Matrix{T}
-end
-
 function solveDiffusion_threaded(
     color_list,
     CMidx,

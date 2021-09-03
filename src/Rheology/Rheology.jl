@@ -43,26 +43,8 @@ function getviscosity!(η::TemperatureDependant, T)
     end
 end
 
-function state_equation(α,T)
-    # Reference density
-    ρ0 = 1
-    
-    # Temperature effect on density
-    # (α is thermal expansion coeff, ρ is defined at the nodes)
-    @. ρ0 * (1-α*T);
-    # T
-end
+# Temperature effect on density
+# (α is thermal expansion coeff, ρ is defined at the nodes)
+state_equation(α,T; ρ0 = 1) = @. ρ0 * (1-α*T);
 
-function state_equation!(ρ,α,T)
-    # Reference density
-    # ρ0 = 1
-    ρ .= ones(length(T))
-
-    # # Temperature effect on density
-    # # (α is thermal expansion coeff, ρ is defined at the nodes)
-    # Threads.@threads for i in axes(ρ,1)
-    #     @inbounds ρ[i] = ρ0 * (1-α*T[i])
-    #     # @inbounds ρ[i] = T[i]
-    # end
-    
-end
+state_equation!(ρ,α,T; ρ0 = 1) = ρ .= ones(length(T))

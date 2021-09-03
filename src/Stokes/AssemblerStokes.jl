@@ -255,12 +255,6 @@ function update_MS!(
     end
 end
 
-function update_force_vector!(F::Vector{Float64}, fe, Udofs)
-     for (_i, i) in enumerate(Udofs)
-        @inbounds @fastmath F[i] += fe[_i]
-    end
-end
-
 function stokes_immutables(gr, nnod, ndim, nvert, nnodel, nel, nip)
     # Constant mesh values
     ScratchStokes = ScratchThermalGlobal(ndim, # := model dimension

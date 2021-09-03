@@ -1,11 +1,19 @@
+abstract type Cartesian end
+abstract type Polar end
+
+mutable struct Point2D{T}
+    x::Float64
+    z::Float64
+end
+
 struct Grid{T,N}
-    x::Array{T,1}
-    z::Array{T,1}
-    θ::Array{T,1}
-    r::Array{T,1}
-    e2n::Array{N,2}
-    e2n_p1::Array{N,2}
-    e2nP::Array{N,2}
+    x::Vector{T}
+    z::Vector{T}
+    θ::Vector{T}
+    r::Vector{T}
+    e2n::Matrix{N}
+    e2n_p1::Matrix{N}
+    e2nP::Matrix{N}
     nel::N
     nnod::N
     nVnod::N
@@ -13,15 +21,18 @@ struct Grid{T,N}
     neighbours::Vector{Vector{N}}
 end
 
+struct ElementCoordinates{T}
+    θ::Matrix{T}
+    r::Matrix{T}
+end
+
 cartesian2polar(x,z) = (atan(x,z), sqrt(x^2+z^2))
 polar2cartesian(x,z) = (z*sin(x), z*cos(x))
 
-function Grid(nθ::Int64, nr::Int64)
-        # 1 = split rectangle into 2 triangles
-        # 2 = split rectangle into 4 triangles
-    R  = 2.22 
-    r_out = R
-    r_in = 1.22
+function Grid(nθ::Int64, nr::Int64; r_out=2.22, r_in=1.22)
+    
+    r_out = r_out
+    r_in = r_in
     nn = nr*(nθ)# total number of nodes
     nels = (nr-1)*nθ
     r = fill(0.0, nn)

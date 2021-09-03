@@ -256,21 +256,6 @@ function kernelF2particle!(particle_fields,Fxx_smooth,Fzz_smooth,Fxz_smooth,Fzx_
     end
 end
 
-# function smoothfield(A,EL2NOD,area_el,w,A_smooth) 
-#     fill!(A_smooth,0.0)
-#     fill!(w,0.0)
-#     @inbounds for i in 1:6
-#         idx = view(EL2NOD,i,:)
-#         e2ni = idx'
-#         dummy = accumarray(e2ni,area_el)
-#         @views w[idx] += view(dummy,idx)
-
-#         dummy = accumarray(e2ni,view(A,:,i).*area_el)
-#         @views A_smooth[idx] += view(dummy,idx)
-#     end
-#     A_smooth./w
-# end
-
 function smoothfield(F, EL2NOD, w, dummy) 
     fill!(dummy, 0.0)
     fill!(w, 0)
@@ -783,7 +768,7 @@ end
 
 @inline function weightednode2particle(A, ω)
     a, b = 0.0, 0.0
-    @turbo for i in axes(A,1)
+    @turbo warn_check_args=false for i in axes(A,1)
         a += ω[i]*A[i]
         b += ω[i]
     end

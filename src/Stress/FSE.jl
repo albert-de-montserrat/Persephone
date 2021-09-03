@@ -1,9 +1,3 @@
-# module FiniteStrain
-
-# __precompile__(true)
-
-# using LinearAlgebra,StaticArrays
-
 struct FiniteStrainEllipsoid{T}
     x1::T
     x2::T
@@ -15,7 +9,6 @@ end
 
 rebuild_FSE(vx1, vx2, vy1, vy2, a1, a2) = [FiniteStrainEllipsoid(vx1[i], vx2[i], vy1[i], vy2[i], a1[i], a2[i]) for i in CartesianIndices(a1)]
 
-#############################################
 function getFSE(F, FSE)
     Threads.@threads for iel in eachindex(F)
         local_FSE!(FSE, F, iel)
@@ -71,12 +64,12 @@ function FSEips(U, particle_fields, particle_weights, particle_info, gr, coordin
         #===========================================================================
         CALCULATE JACOBIAN, ITS DETERMINANT AND INVERSE
         ===========================================================================#
-        """
+        #=
         NOTE: For triangular elements with non-curved edges the Jacobian is
               the same for all integration points (i.e. calculated once
               before the integration loop). Further, linear 3-node shape are
               sufficient to calculate the Jacobian.
-        """
+        =#
 
         # Parent element
         iel = particle_info[ipart].t_parent
@@ -172,7 +165,7 @@ function volume_integral(V, EL2NOD, θ, r)
 
     ## LOOP OVER ELEMENETS
     integral = zeros(nel)
-    @inbounds Threads.@threads for iel in 1:nel
+    Threads.@threads for iel in 1:nel
         #= NOTE: For triangular elements with non-curved edges the Jacobian is
               the same for all integration points (i.e. calculated once
               before the integration loop). Further, linear 3-node shape are
@@ -216,7 +209,6 @@ function volume_integral(V, EL2NOD, θ, r)
     return sum(integral)
     
 end # END OF ASSEMBLY FUNCTION
-
 
 function volume_integral_cartesian(V, gr)
     ## MODEL PARAMETERS

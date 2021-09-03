@@ -1,4 +1,8 @@
-include("Mixer.jl")
+# include("Mixer.jl")
+import Pkg; Pkg.activate(".")
+using Persephone
+using LinearAlgebra, TimerOutputs
+import Statistics:mean
 
 function main()
 
@@ -113,7 +117,6 @@ function main()
     # Allocate nodal velocities
     Ucartesian, Upolar = initvelocity(gr.nnod)
     # Initialise temperature
-    IDs = domain_ids(GlobC)
     T = init_temperature(gr, IDs)
     init_particle_temperature!(particle_fields, particle_info)
     ΔT = similar(T)
@@ -320,11 +323,8 @@ function main()
                 @timeit to "Locate" particle_info, particle_weights, found = tsearch_parallel(
                     particle_info, particle_weights, θThermal, rThermal, gr.neighbours, IntC
                 )
-
                 lost_particles = length(particle_info) - sum(found)
-
                 check_corruption!(found, particle_fields)
-
                 println("Lost particles: ", lost_particles, " Corrupted particles: ",  length(particle_info) - sum(found) -lost_particles)
 
                 if lost_particles > 0
