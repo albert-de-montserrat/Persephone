@@ -15,12 +15,12 @@ function step_RK(
     neighbours, e2n_p1 = gr.neighbours, gr.e2n_p1
 
     # (a) velocity @ particles  
-    # particle_info = velocities2particle(particle_info,
-    #                                     e2n_p1,
-    #                                     particle_weights,
-    #                                     Ucartesian)
+    particle_info = velocities2particle(particle_info,
+                                        e2n_p1,
+                                        particle_weights,
+                                        Ucartesian)
 
-    velocities2particle_cubic!(gr, particle_info, Ucartesian)
+    # velocities2particle_cubic!(gr, particle_info, Ucartesian)
 
     # (b) advect particles  
     xp, zp, particle_info = particlesadvection(xp0, zp0, particle_info, Δt, multiplier=multiplier)
@@ -221,13 +221,13 @@ function advection_RK_step4!(Particles, xp0, zp0, Uxp1, Uzp1, Uxp2, Uzp2, Uxp3, 
 end
 
 @inline function velocities2particle(particle_info, e2n_p1, particle_weights, Ucartesian)
-    @inbounds Threads.@threads for i in axes(particle_info,1)
+    Threads.@threads for i in axes(particle_info,1)
         # -- Reshape velocity arrays 
         # Ux_p1, Uz_p1 = getvelocity(Ucartesian, view(e2n_p1,:,particle_info[i].t) )
         # -- Velocity interpolation (directly using linear SF)
-        particle_info[i].UCart.x = node2particle(getvelocityX(Ucartesian, view(e2n_p1,:,particle_info[i].t)),
+        @inbounds particle_info[i].UCart.x = node2particle(getvelocityX(Ucartesian, view(e2n_p1,:,particle_info[i].t)),
                                                  particle_weights[i].barycentric)
-        particle_info[i].UCart.z = node2particle(getvelocityZ(Ucartesian, view(e2n_p1,:,particle_info[i].t)),
+        @inbounds particle_info[i].UCart.z = node2particle(getvelocityZ(Ucartesian, view(e2n_p1,:,particle_info[i].t)),
                                                  particle_weights[i].barycentric)
     end
     return particle_info

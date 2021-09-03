@@ -26,7 +26,7 @@ function main()
         MAKE GRID
     =========================================================================#
     split = 2
-    N = 4
+    N = 3
     if split == 1
         nr = Int(1 + 2^N)
         nθ = Int(12 * 2^N)
@@ -34,8 +34,8 @@ function main()
     else
         nr = Int(1+2^N)
         nθ = Int(12*2^N)
-        nr = Int(1 + 32)
-        nθ = Int(256)
+        # nr = Int(1 + 32)
+        # nθ = Int(256)
         gr = Grid(nθ, nr)
     end
     IDs = point_ids(gr)
@@ -102,7 +102,7 @@ function main()
         INITIALISE PARTICLES
     =========================================================================#
     particle_info, particle_weights = particles_generator(
-        θThermal, rThermal, IntC, gr.e2n_p1
+        θThermal, rThermal, IntC, gr.e2n_p1, number_of_particles = 12
     )
     particle_fields = init_pvars(length(particle_info))
 
@@ -116,10 +116,11 @@ function main()
     𝓒 = 𝓒init(gr.nel, 7)
     # Allocate nodal velocities
     Ucartesian, Upolar = initvelocity(gr.nnod)
-    # Initialise temperature
+    # Initialise temperature @ nodes
     T = init_temperature(gr, IDs)
-    init_particle_temperature!(particle_fields, particle_info)
     ΔT = similar(T)
+    # Initialise temperature @ particles
+    init_particle_temperature!(particle_fields, particle_info)
 
     viscosity_type = "IsoviscousIsotropic"
     #= Options:
@@ -138,8 +139,7 @@ function main()
     )
 
     ρ = state_equation(VarT.α, T)
-    # η = getviscosity(T, viscosity_type; η=1.81) η=1 is the default
-    η = getviscosity(T, viscosity_type, η = 1)
+    η = getviscosity(T, viscosity_type, η = 1) # η = 1 for isotropic,  η = 1.81 for aniisotropic
     Valη = Val(η)
     g = 1e4
     𝓒 = anisotropic_tensor(FSE, D, Valη, ipx)
@@ -240,7 +240,7 @@ function main()
 
             #= Compute the viscous tensor =#
             @timeit to "Get and rotate viscous tensor" begin
-                𝓒 = anisotropic_tensor(FSE, D, Valη, ipx)
+                𝓒 = anisotropic_tensor(FSE, D, Valη)
             end
 
             #=
@@ -274,17 +274,16 @@ function main()
                     Ui  : node |-> particle + advection
                 =#
 
-                @timeit to "F → particle"  particle_fields = 
-                       Fij2particle(particle_fields,
-                                    particle_info,
-                                    particle_weights,
-                                    gr,
-                                    F)
+                # @timeit to "F → particle"  particle_fields = 
+                #        Fij2particle(particle_fields,
+                #                     particle_info,
+                #                     particle_weights,
+                #                     gr,
+                #                     F)
 
-                # @timeit to "F → particle" particle_fields = F2particle(
-                #     particle_fields, particle_info, ipx, ipz, F
-                # )
-    
+                @timeit to "F → particle" particle_fields = F2particle(
+                    particle_fields, particle_info, ipx, ipz, F
+                )
                 @timeit to "T → particle" begin
                     interpolate_temperature!(
                         T0,
@@ -323,6 +322,7 @@ function main()
                 @timeit to "Locate" particle_info, particle_weights, found = tsearch_parallel(
                     particle_info, particle_weights, θThermal, rThermal, gr.neighbours, IntC
                 )
+
                 lost_particles = length(particle_info) - sum(found)
                 check_corruption!(found, particle_fields)
                 println("Lost particles: ", lost_particles, " Corrupted particles: ",  length(particle_info) - sum(found) -lost_particles)

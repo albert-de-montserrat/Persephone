@@ -164,7 +164,7 @@ function kernel_Fij_particle!(particle_fields, particle_info, ipx, ipz, F, i)
 end
 
 function F2particle(particle_fields, particle_info, ipx, ipz, F)
-    Threads.@threads for ipart in 1:length(particle_info)
+    @batch for ipart in 1:length(particle_info)
         kernel_Fij_particle!(particle_fields, particle_info, ipx, ipz, F, ipart)
     end
     particle_fields
@@ -420,8 +420,10 @@ end
     Cp, κ = VarT.Cp, VarT.κ
 
     # allocations
-    nt = Threads.nthreads()
-    Tᵢ0 = Vector{Float64}(undef, nt)
+    T, ΔT_subgrid = particle_fields.T, particle_fields.ΔT_subgrid
+    t = [p.t for p in particle_info]
+    # nt = Threads.nthreads()
+    # Tᵢ0 = Vector{Float64}(undef, nt)
     # Tᵢ = Vector{Float64}(undef, nt)
     # ρᵢ = Vector{Float64}(undef, nt)
 
@@ -437,22 +439,41 @@ end
     d = 1
 
     # loop
-    Threads.@threads for i in eachindex(particle_info)
+    @batch for i in eachindex(particle_info)
 
-        # -- Store old T
-        @inbounds Tᵢ0[Threads.threadid()] = weightednode2particle(
-            view(T0, view(e2n_p1,:,particle_info[i].t)),
-            particle_weights[i].barycentric
-            )
+        # # -- Store old T
+        # @inbounds Tᵢ0[Threads.threadid()] = weightednode2particle(
+        #     view(T0, view(e2n_p1,:,particle_info[i].t)),
+        #     particle_weights[i].barycentric
+        #     )
         
-        # Δt_diff = ρᵢ[Threads.threadid()]*multiplier
-        @inbounds particle_fields.ΔT_subgrid[i] = (Tᵢ0[Threads.threadid()] - particle_fields.T[i])*(1 - exp(-d*multiplier))
-        @inbounds particle_fields.T[i] += particle_fields.ΔT_subgrid[i]
+        # # Δt_diff = ρᵢ[Threads.threadid()]*multiplier
+        # @inbounds particle_fields.ΔT_subgrid[i] = (Tᵢ0[Threads.threadid()] - particle_fields.T[i])*(1 - exp(-d*multiplier))
+        # @inbounds particle_fields.T[i] += particle_fields.ΔT_subgrid[i]
+        
+        @inbounds T[i], ΔT_subgrid[i] = _temperature2particle(T[i], view(T0, view(e2n_p1,:,t)),  particle_weights[i].barycentric, d, multiplier)
 
     end
 
+    particle_fields.T.= T
+    particle_fields.ΔT_subgrid .= ΔT_subgrid
+
     return particle_fields
 
+end
+
+
+function _temperature2particle(Ti, T0, barycentric, d, multiplier)
+    # Old T
+    @inbounds Tᵢ0 = weightednode2particle(
+       T0,
+       barycentric
+    )
+    
+    ΔT_subgrid = (Tᵢ0 - Ti)*(1 - exp(-d*multiplier))
+    Ti += ΔT_subgrid
+
+    return Ti, ΔT_subgrid
 end
 
 function corrected_particle_temperature!(particle_fields, ΔT_remaining)
@@ -464,9 +485,9 @@ end
 function F2ip(F, particle_fields, particle_info, particle_weights, nel)
     np = length(particle_info)
     weight = Array{Float64,2}(undef, np, 6)
-    @inbounds Threads.@threads for i in axes(particle_info,1)
+    Threads.@threads for i in axes(particle_info,1)
         ## THIS IS TYPE UNSTABLE -> FIX ASAP
-        @views weight[i,:] .= 1.0./particle_weights[i].ip_weights # inverse of the distance
+        @inbounds @views weight[i,:] .= 1.0./particle_weights[i].ip_weights # inverse of the distance
     end
 
     F2ip_inner_tkernel(F, particle_info, particle_fields, weight, nel)
@@ -528,7 +549,7 @@ function F2ip_inner_tkernel(F, particle_info, particle_fields, weight, nel)
 
     # Acummarray on each thread
     Threads.@threads for i in axes(weight,1)
-        ω = ntuple(j->weight[i,j], 6)
+        @inbounds ω = ntuple(j->weight[i,j], 6)
         @inbounds @views @. Fxx[Threads.threadid()][particle_info[i].t_parent, :] += particle_fields.Fxx[i]* ω
         @inbounds @views @. Fxz[Threads.threadid()][particle_info[i].t_parent, :] += particle_fields.Fxz[i]* ω
         @inbounds @views @. Fzx[Threads.threadid()][particle_info[i].t_parent, :] += particle_fields.Fzx[i]* ω
@@ -705,12 +726,14 @@ function nodalfield2partcle(field, e2n, particle_weights, particle_info)
     # memory allocations
     np = length(particle_info)
     field_particle = Vector{Float64}(undef, np)
+    t = [p.t for p in particle_info]
+    barycentric = [p.barycentric for p in particle_weights]
 
     # interpolate from node to corresponding particle
     Threads.@threads for i in 1:np
         @inbounds field_particle[i] = weightednode2particle(
-            (@views field[e2n[:, particle_info[i].t]]),
-            particle_weights[i].barycentric
+            (@views field[e2n[:, t[i]]]),
+            barycentric[i]
         )
     end
     field_particle

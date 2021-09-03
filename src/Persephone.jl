@@ -9,6 +9,7 @@ using IterativeSolvers
 using Preconditioners
 using HDF5
 using TimerOutputs
+using Polyester
 
 import Statistics: mean
 

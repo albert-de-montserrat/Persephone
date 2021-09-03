@@ -722,7 +722,7 @@ function tsearch_parallel(particle_info, particle_weights, θThermal, rThermal, 
     vertices = [[Point2D{Polar}(0.0, 0.0) for _ = 1:3] for _ in 1:Threads.nthreads()] # element vertices 
     
     # Find particles who remain within same old triangular element
-    Threads.@threads for ipart in 1:np
+    @batch for ipart in 1:np
         # check if particle is in the same triangle as in previous time step i.e. found = true
         isinparent!(particle_info, θThermal, rThermal, vertices, found, ipart)
         if found[ipart] == false

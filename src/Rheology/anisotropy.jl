@@ -221,12 +221,8 @@ function fittingcoefficients()
     return R1,R2
 end
 
-# anisotropic_tensor(FSE::Array{FiniteStrainEllipsoid{Float64},2}, D::DEM, ::Val{Isotropic}, ipx) = 
-#     StiffnessTensor([0.0 0.0], [0.0 0.0], [0.0 0.0], [0.0 0.0], [0.0 0.0], [0.0 0.0])
-    
-# function anisotropic_tensor(FSE::Array{FiniteStrainEllipsoid{Float64},2}, D::DEM, ::Val{Anisotropic},ipx)
-function anisotropic_tensor(FSE::Array{FiniteStrainEllipsoid{Float64},2}, D::DEM, ::Val{T}, ipx) where {T}
-    # -- Allocate arrays
+function anisotropic_tensor(FSE::Array{FiniteStrainEllipsoid{Float64},2}, D::DEM, ::Val{T}) where {T}
+    # Allocate arrays
     nu_11 = Array{Float64,2}(undef, size(FSE, 1), 7)
     nu_33 = similar(nu_11)
     nu_55 = similar(nu_11)
@@ -237,23 +233,25 @@ function anisotropic_tensor(FSE::Array{FiniteStrainEllipsoid{Float64},2}, D::DEM
     v₂ = [similar(D.a2a3_blk) for _ in 1:Threads.nthreads()]
     max_a1a2, max_a2a3 = maximum(D.a1a2_blk), maximum(D.a2a3_blk)
     
-    # -- Fitting coefficients of the axes parameterisation
+    # Fitting coefficients of the axes parameterisation
     R1, R2 = fittingcoefficients()
     
-    # -- Get η from data base and rotate it
-    for i in eachindex(FSE)
+    # Get η from data base and rotate it
+    @batch for i in eachindex(FSE)
         get_tensor_and_rotate!( nu_11, nu_33, nu_55, nu_13, nu_15, nu_35,
-                                FSE[i],R1,R2,D,i,v₁,v₂, max_a1a2, max_a2a3,ipx[i])
+                                FSE[i],R1,R2,D,i,v₁,v₂, max_a1a2, max_a2a3)
     end
 
     # -- 7th ip
-    nu_11[:,7] .= @. (nu_11[:,1] + nu_11[:,2] + nu_11[:,3] + nu_11[:,4] + nu_11[:,5] + nu_11[:,6])/6
-    nu_33[:,7] .= @. (nu_33[:,1] + nu_33[:,2] + nu_33[:,3] + nu_33[:,4] + nu_33[:,5] + nu_33[:,6])/6
-    nu_55[:,7] .= @. (nu_55[:,1] + nu_55[:,2] + nu_55[:,3] + nu_55[:,4] + nu_55[:,5] + nu_55[:,6])/6
-    nu_13[:,7] .= @. (nu_13[:,1] + nu_13[:,2] + nu_13[:,3] + nu_13[:,4] + nu_13[:,5] + nu_13[:,6])/6
-    nu_15[:,7] .= @. (nu_15[:,1] + nu_15[:,2] + nu_15[:,3] + nu_15[:,4] + nu_15[:,5] + nu_15[:,6])/6
-    nu_35[:,7] .= @. (nu_35[:,1] + nu_35[:,2] + nu_35[:,3] + nu_35[:,4] + nu_35[:,5] + nu_35[:,6])/6
-
+    one_sixth = 1/6
+    @tturbo for i in 1:size(nu_11,1)
+        nu_11[i,7] = (nu_11[i,1] + nu_11[i,2] + nu_11[i,3] + nu_11[i,4] + nu_11[i,5] + nu_11[i,6]) * one_sixth
+        nu_33[i,7] = (nu_33[i,1] + nu_33[i,2] + nu_33[i,3] + nu_33[i,4] + nu_33[i,5] + nu_33[i,6]) * one_sixth
+        nu_55[i,7] = (nu_55[i,1] + nu_55[i,2] + nu_55[i,3] + nu_55[i,4] + nu_55[i,5] + nu_55[i,6]) * one_sixth
+        nu_13[i,7] = (nu_13[i,1] + nu_13[i,2] + nu_13[i,3] + nu_13[i,4] + nu_13[i,5] + nu_13[i,6]) * one_sixth
+        nu_15[i,7] = (nu_15[i,1] + nu_15[i,2] + nu_15[i,3] + nu_15[i,4] + nu_15[i,5] + nu_15[i,6]) * one_sixth
+        nu_35[i,7] = (nu_35[i,1] + nu_35[i,2] + nu_35[i,3] + nu_35[i,4] + nu_35[i,5] + nu_35[i,6]) * one_sixth
+    end
     return StiffnessTensor(nu_11, nu_33, nu_55, nu_13, nu_15, nu_35)
 
 end ### END rotate_tensor FUNCTION #############################################
@@ -285,7 +283,7 @@ end
 
 
 function get_tensor_and_rotate!(nu_11, nu_33, nu_55, nu_13, nu_15, nu_35,
-                                FSEᵢ,R1,R2,D,i,v₁,v₂,max_a1a2,max_a2a3, ipx)
+                                FSEᵢ,R1,R2,D,i,v₁,v₂,max_a1a2,max_a2a3)
     # Average fabric -> r₁ = log10(a1/a2) and r₂ = log10(a2/a3)
     a1 = applybounds(FSEᵢ.a1, 25.0, 1.0)
     a2 = applybounds(FSEᵢ.a2, 1.0, 0.01)
@@ -297,31 +295,19 @@ function get_tensor_and_rotate!(nu_11, nu_33, nu_55, nu_13, nu_15, nu_35,
                                     R2)
     nt = Threads.threadid()
 
-    # if r₁ > max_a1a2
-    #     # r₁_imin = 49
-    #     r₁_imin, r₁_imin2 = 49, 49
-    # else
+   
     @inbounds for j in eachindex(D.a1a2_blk)
         v₁[nt][j] = abs(r₁-D.a1a2_blk[j])
     end
     r₁_imin = argminsorted(v₁[nt])
-        # r₁_imin, r₁_imin2 = argminsortedsecond(v₁[nt])
-    # end
-
-    # if r₂ > max_a2a3
-    #     r₂_imin, r₂_imin2 = 50, 50
-    # else
-        @inbounds for j in eachindex(D.a2a3_blk)
-            v₂[nt][j] = abs(r₂-D.a2a3_blk[j])
-        end
-        r₂_imin = D.permutation_blk[argminsorted(v₂[nt])]
-        # idx = argminsortedsecond(v₂[nt])
-        # r₂_imin = D.permutation_blk[idx[1]]
-        # r₂_imin2 = D.permutation_blk[idx[2]]
-
-    # end
-
+  
+    @inbounds for j in eachindex(D.a2a3_blk)
+        v₂[nt][j] = abs(r₂-D.a2a3_blk[j])
+    end
+    r₂_imin = D.permutation_blk[argminsorted(v₂[nt])]
+       
     im = D.sblk*(r₁_imin-1) + r₂_imin
+
     # Allocate stiffness tensor
     C = @SMatrix [D.𝓒[im, 1]  D.𝓒[im, 7]  D.𝓒[im, 8]  0          0           0
                   D.𝓒[im, 7]  D.𝓒[im, 2]  D.𝓒[im, 9]  0          0           0
@@ -329,36 +315,21 @@ function get_tensor_and_rotate!(nu_11, nu_33, nu_55, nu_13, nu_15, nu_35,
                   0           0           0           D.𝓒[im, 4] 0           0 
                   0           0           0           0          D.𝓒[im, 5]  0
                   0           0           0           0          0           D.𝓒[im, 6]]
-    ## =================================================================
 
-    ## ROTATE VISCOUS TENSOR ===========================================
+    # Rotation matrix
     a = atand(FSEᵢ.y1, FSEᵢ.x1)
     R = @SMatrix [cosd(a)  0   sind(a)
                    0       1   0
                  -sind(a)  0   cosd(a)]
-    # ----- Rotate tensor (fast version derived from symbolic calculus)
+    # Rotate tensor (fast version derived from symbolic calculus)
     η11,η33,η55,η13,η15,η35 = directRotation2D(R,C)
-    # dummy = (abs(η15)+abs(η35))*0.5
-    @fastmath begin
-        nu_11[i] = η11
-        nu_33[i] = η33
-        nu_55[i] = max(η55, 0.27)
-        # nu_55[i] = η55
-        nu_13[i] = η13
-        nu_15[i] = η15
-        nu_35[i] = η35
-        # nu_15[i] = sign(η15)*dummy
-        # nu_35[i] = sign(η35)*dummy
-
-        # nu_11[i] = η11 - η13
-        # nu_33[i] = η33 - η13
-        # # nu_55[i] = max(η55, 0.1)
-        # nu_55[i] = η55
-        # nu_13[i] = η13*0
-        # nu_15[i] = η15
-        # nu_35[i] = η35
-    end
-    # ==================================================================
+    # Fill array
+    nu_11[i] = η11
+    nu_33[i] = η33
+    nu_55[i] = max(η55, 0.27)
+    nu_13[i] = η13
+    nu_15[i] = η15
+    nu_35[i] = η35
 end
 
 function unrotate_anisotropic_tensor(𝓒,vx1,vx2,vy1,vy2)

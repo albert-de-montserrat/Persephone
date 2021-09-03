@@ -234,10 +234,8 @@ function _pardiso(A:: SparseMatrixCSC,B::Vector{Float64})
     
     return X        
 
-end # END PARDISO 6.2 N.2
+end 
 
-
-# BUILT-IN CHOLESKY SOLVER N.2 ===========================================================
 function _Cholesky!(T::Vector{Float64},KK:: SparseMatrixCSC,Rhs::Vector{Float64},ifree::Vector{Int64})
     Rhs_free    = view(Rhs,ifree)
     A           = KK[ifree,ifree]
@@ -245,7 +243,6 @@ function _Cholesky!(T::Vector{Float64},KK:: SparseMatrixCSC,Rhs::Vector{Float64}
     T[ifree]    = A.L'\(A.L\Rhs_free[A.p])
 end # END CHOLESKY SOLVER 
 
-# BUILT-IN CHOLESKY SOLVER N.3 ===========================================================
 """
 Solve Symmetric Positive Definite system of eqs using via CHOLESKY factorization and allocate solution
 in the un-constrained elements of the solution array containing allocated boundary conditions. Return 
@@ -254,12 +251,11 @@ solution T and factorization F
 @inline function _CholeskyFactorizationSolve(T::Vector{Float64},KK::SparseMatrixCSC,Rhs::Vector{Float64},ifree::Vector{Int64})
     K = KK[ifree,ifree]
     # F = cholesky((K')')
-    F = factorize((K')')
+    # F = factorize((K')')
+    F = lu(K)
     _CholeskyWithFactorization!(T,F,Rhs,ifree)
     return T,F
-end # END CHOLESKY SOLVER 
-
-# BUILT-IN CHOLESKY SOLVER N.3 ===========================================================
+end 
 """
 Solve Symmetric Positive Definite system of eqs using via CHOLESKY factorization. Return 
 solution T and factorization F
@@ -270,9 +266,8 @@ solution T and factorization F
     F = factorize((A')')
     T = F\Rhs[ifree]        
     return T, F
-end # END CHOLESKY SOLVER 
+end 
 
-# SOLVE CHOLESKY WITH A GIVEN LLT FACTORIZATION =============================================
 """
 Solve Symmetric Positive Definite system of eqs using A GIVEN factorization and allocate solution
 in the un-constrained elements of the solution array containing allocated boundary conditions. In 
@@ -280,6 +275,4 @@ place substitution of input solution array T
 """
 @inline function _CholeskyWithFactorization!(T::Vector{Float64}, A, Rhs, ifree::Vector{Int64})
     T[ifree] .= A\Rhs[ifree]    
-end # END CHOLESKY SOLVER 
-
-# end # END OF MODULE
+end 

@@ -10,7 +10,7 @@ end
 rebuild_FSE(vx1, vx2, vy1, vy2, a1, a2) = [FiniteStrainEllipsoid(vx1[i], vx2[i], vy1[i], vy2[i], a1[i], a2[i]) for i in CartesianIndices(a1)]
 
 function getFSE(F, FSE)
-    Threads.@threads for iel in eachindex(F)
+    @batch for iel in eachindex(F)
         local_FSE!(FSE, F, iel)
     end
     FSE

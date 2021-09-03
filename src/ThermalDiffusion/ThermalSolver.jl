@@ -109,7 +109,7 @@ function assembly_thermal_cylindric(EL2NOD, θStokes, rStokes,
         J_th = VCOORD_th'*dN3ds'
         J_r = VCOORD_r'*dN3ds'
 
-        _fill_R_J!(J_th, J_r, VCOORD_th, VCOORD_r,
+        _fill_R_J_thermal!(J_th, J_r, VCOORD_th, VCOORD_r,
                    R_31, R_21, Th_31, Th_21, detJ_PL)
 
         # ------------------------ NUMERICAL INTEGRATION LOOP (GAUSS QUADRATURE)
@@ -286,6 +286,27 @@ function sumrows(a::Array{Float64,2})
             b[i] += a[i,j]
     end
     return b
+end
+
+function _fill_R_J_thermal!(J_th,J_r,VCOORD_th,VCOORD_r,
+    R_31,R_21,Th_31,Th_21,detJ_PL)
+
+    VCOORD_r1    = view(VCOORD_r,1,:)
+    VCOORD_r2    = view(VCOORD_r,2,:)
+    VCOORD_r3    = view(VCOORD_r,3,:)
+    VCOORD_th1   = view(VCOORD_th,1,:)
+    VCOORD_th2   = view(VCOORD_th,2,:)
+    VCOORD_th3   = view(VCOORD_th,3,:)
+
+    @inbounds for i ∈ 1:length(R_31)
+        detJ_PL[i] = J_th[i,1]*J_r[i,2] - J_th[i,2]*J_r[i,1]
+        R_31[i]    = VCOORD_r3[i]  - VCOORD_r1[i]  # =  detJa_PL*dxi_dth
+        R_21[i]    = VCOORD_r2[i]  - VCOORD_r1[i]  # = -detJa_PL*deta_dth
+        Th_31[i]   = VCOORD_th3[i] - VCOORD_th1[i] # = -detJa_PL*dxi_dr
+        Th_21[i]   = VCOORD_th2[i] - VCOORD_th1[i] # =  detJa_PL*deta_dr
+    end
+
+    return R_31,R_21,Th_31,Th_21,detJ_PL
 end
 
 function _derivative_weights!(∇N,ω,dNdx,dNdy,w_ip,th_ip,r_ip,
