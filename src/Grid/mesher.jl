@@ -65,8 +65,7 @@ function Grid(nθ::Int64, nr::Int64; r_out=2.22, r_in=1.22)
         end
     end
 
-
-    # -- Split quadrilateral in 2 triangles
+    # Split quadrilateral in 2 triangles
     ntri = nels * 4
     id_els_tri = Array{Int64,2}(undef,ntri,3)
     dθ /= 2
@@ -80,22 +79,19 @@ function Grid(nθ::Int64, nr::Int64; r_out=2.22, r_in=1.22)
     i3 = [3, 4]
     i4 = [4, 1]
     @inbounds for ii in 1 : nels
-        # -- connectivity matrix
+        # connectivity matrix
         idx = @. (1:4) + 4*(ii-1)
         id_els_tri[idx[1],:] = [id_el[ii,i1]' id_centers[ii]]
         id_els_tri[idx[2],:] = [id_el[ii,i2]' id_centers[ii]]
         id_els_tri[idx[3],:] = [id_el[ii,i3]' id_centers[ii]]
         id_els_tri[idx[4],:] = [id_el[ii,i4]' id_centers[ii]]
-        
-        # -- coords of central node            
+        # coords of central node            
         θ_c[ii] = θ[id_el[ii,1]] + dθ
         r_c[ii] = r[id_el[ii,1]] + dr/2
-        
     end
 
     r = vcat(r, r_c)
     θ = vcat(θ, θ_c)
-    
     EL2NOD = Array(id_els_tri')
     neighbours = element_neighbours(EL2NOD)
     θ, r, EL2NOD = add_midpoints(EL2NOD, neighbours, θ, r)
@@ -236,7 +232,6 @@ function inradius(gr::Grid)
 end
 
 function sixth_node(EL2NOD, θ, r)
-
     nel = size(EL2NOD, 2)
     nnod = maximum(EL2NOD)
     θel = θ[EL2NOD[1:3,:]]
@@ -246,9 +241,7 @@ function sixth_node(EL2NOD, θ, r)
     r_new = mean(rel, dims=1)
     θ = vcat(θ, vec(θ_new))
     r = vcat(r, vec(r_new))
-
     return vcat(EL2NOD, transpose(nnod.+(1:nel))), θ, r
-
 end
 
 function p2top1(EL2NOD)
@@ -269,7 +262,7 @@ function element_neighbours(e2n)
     els = size(e2n,1) == 3 ? e2n : view(e2n, 1:3,:)
     nel = size(els,2)
 
-    ## ---- Incidence matrix
+    # Incidence matrix
     I, J, V = Int[], Int[], Bool[]
     @inbounds for i in axes(els,1), j in axes(els,2)
         node = els[i,j]
@@ -279,7 +272,7 @@ function element_neighbours(e2n)
     end
     incidence_matrix = sparse(J, I, V)
 
-    # ---- Find neighbouring elements
+    # Find neighbouring elements
     neighbour = [Int64[] for _ in 1:nel]
     nnod = I[end]
     @inbounds for node in 1:nnod
@@ -351,7 +344,6 @@ end
 
 function add_midpoints(EL2NOD, neighbours, θ, r)
     el2edge, edges2node = edge_connectivity(EL2NOD, neighbours)
-
     # make mid points
     nnods = size(edges2node, 1)
     θmid = Vector{Float64}(undef,nnods)
@@ -373,7 +365,6 @@ function add_midpoints(EL2NOD, neighbours, θ, r)
     EL2NOD_new = el2edge .+ old_nnods
 
     return vcat(θ, θmid), vcat(r, rmid), vcat(EL2NOD, EL2NOD_new)
-
 end
 
 
