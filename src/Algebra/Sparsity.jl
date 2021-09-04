@@ -9,17 +9,11 @@ end
 
 function sparsitystokes(gr)
     EL2NOD, EL2NODP = gr.e2n, gr.e2nP
-    # ============================================ MODEL AND BLOCKING PARAMETERS
     ndim            = 2
     nnodel          = size(EL2NOD,1)
-   
-    # =========== PREPARE INTEGRATION POINTS & DERIVATIVES wrt LOCAL COORDINATES
     nUdofel         = ndim * nnodel
     nPdofel         = size(EL2NODP,1)
    
-    # #===========================================================================
-    # ASSEMBLY OF GLOBAL SPARSE MATRICES AND RHS-VECTOR
-    # ===========================================================================#
     KKidx, GGidx, MMidx, invMMidx = _create_stokes_matrices(EL2NOD,EL2NODP,nUdofel,nPdofel,ndim)
 
     K = sparse(KKidx._i, KKidx._j, 1.0)
@@ -40,10 +34,7 @@ end
 
     indx_i  = tril(indx_i); indxx_i = vec(indx_i); filter!(x->x>0,indxx_i)
     indx_j  = tril(indx_j); indxx_j = vec(indx_j); filter!(x->x>0,indxx_j)
-
-    #==========================================================================
-    ASSEMBLY OF GLOBAL STIFFNESS MATRIX
-    ==========================================================================#
+    
     EL2DOF                    = Array{Int64}(undef,nUdofel, nel)
     EL2DOF[1:ndim:nUdofel,:] .= @. ndim*(EL2NOD-1)+1
     EL2DOF[2:ndim:nUdofel,:] .= @. ndim*(EL2NOD-1)+2
