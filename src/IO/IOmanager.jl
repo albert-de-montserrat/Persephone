@@ -6,6 +6,14 @@ struct IOs{T,I}
     iplot::I
 end
 
+function setup_output(path, folder)
+    filename = "file"
+    iplot = Int32(0)
+    OUT = IOs(path, folder, filename, iplot)
+    mkpath(joinpath(path, folder))
+    return OUT, iplot
+end
+
 function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, EL2NOD, GlobC, 
     particle_fields, particle_info, time2save::Float64, ::Val{Isotropic}) 
 
@@ -212,6 +220,15 @@ function load_particles(fname)
     pz = read(V,"z")
 
     return px, pz
+end
+
+function setup_metrics(gr, path, folder)
+    ScratchNu = ScratchNusselt(gr)
+    stats_file = joinpath(pwd(), path, folder, "statistics.txt")
+    if isfile(stats_file)
+        rm(stats_file)
+    end
+    return ScratchNu, stats_file
 end
 
 function write_stats(U, T, np, gr, Time, ScratchNu, stats_file)

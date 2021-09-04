@@ -12,15 +12,11 @@ function main()
     iscluster = false
     if iscluster
         path = "/storage2/unipd/navarro/AnnulusBenchmarks"
-        folder = "Isotropic_1e4"
     else
         path = "/home/albert/Desktop/output"
-        folder = "aniso4_package"
     end
-    filename = "file"
-    iplot = Int32(0)
-    OUT = IOs(path, folder, filename, iplot)
-    mkpath(joinpath(path, folder))
+    folder = "aniso4_package"
+    OUT, iplot = setup_output(path, folder)
 
     #=========================================================================
         MAKE GRID
@@ -44,6 +40,11 @@ function main()
     PhaseID = 1
     min_inradius = inradius(gr)
 
+    nU = maximum(gr.e2n)
+    nnod = length(gr.θ)
+    P = fill(0.0, maximum(gr.e2nP))
+    U = fill(0.0, nU .* 2)
+
     GlobC = [Point2D{Polar}(gr.θ[i], gr.r[i]) for i in 1:gr.nnod] # → global coordinates
 
     #=========================================================================
@@ -55,23 +56,13 @@ function main()
     #=========================================================================
         Delete existing statistics file    
     =========================================================================#
-    ScratchNu = ScratchNusselt(gr)
-    stats_file = joinpath(pwd(), path, folder, "statistics.txt")
-    if isfile(stats_file)
-        rm(stats_file)
-    end
+    ScratchNu, stats_file  = setup_metrics(gr, path, folder)
 
     #=========================================================================
         GET DEM STRUCTURE:    
     =========================================================================#
     fname = joinpath("DEM", "DEM_1e-3_vol20_new3.h5")
     D = getDEM(fname)
-
-    # =========================================================================
-    nU = maximum(gr.e2n)
-    nnod = length(gr.θ)
-    P = fill(0.0, maximum(gr.e2nP))
-    U = fill(0.0, nU .* 2)
 
     #=========================================================================
         FIX θ OF ELEMENTS CROSSING π and reshape also r (i.e. periodic boundaries)
@@ -98,10 +89,9 @@ function main()
     #=========================================================================
         INITIALISE PARTICLES
     =========================================================================#
-    particle_info, particle_weights = particles_generator(
+    particle_info, particle_weights, particle_fields = particles_generator(
         θThermal, rThermal, IntC, gr.e2n_p1, number_of_particles = 12
     )
-    particle_fields = init_pvars(length(particle_info))
 
     #=========================================================================
         ALLOCATE/INITIALISE FIELDS    
@@ -119,7 +109,7 @@ function main()
     # Initialise temperature @ particles
     init_particle_temperature!(particle_fields, particle_info)
 
-    viscosity_type = "IsoviscousIsotropic"
+    viscosity_type = :IsoviscousIsotropic
     #= Options:
         (*) "IsoviscousIsotropic"
         (*) "TemperatureDependantIsotropic"
@@ -381,7 +371,7 @@ function main()
         =#
         println("\n time = ", Time)
         println("\n Saving output...")
-        OUT = IOs(path, folder, filename, iplot)
+        OUT = IOs(path, folder, "file", iplot)
         savedata(
             OUT,
             Upolar,

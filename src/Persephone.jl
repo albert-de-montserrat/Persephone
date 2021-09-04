@@ -104,6 +104,8 @@ export reloader
 export Nusselt
 export ScratchNusselt
 export savedata
+export setup_output
+export setup_metrics
 
 include("Setup/Setup.jl")
 export ThermalParameters

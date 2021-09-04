@@ -563,7 +563,7 @@ function particles_generator(θ3, r3, IntC, e2n_p1; number_of_particles = 12)
 
     end
 
-    return particle_info,particle_weights
+    return particle_info, particle_weights, init_pvars(length(particle_info))
 end
 
 @inline function bilinear_weigth(vc, pc, N)

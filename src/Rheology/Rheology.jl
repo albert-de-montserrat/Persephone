@@ -16,17 +16,17 @@ Base.Val(x::TemperatureDependant{Anisotropic}) = Val{Anisotropic}()
 
 function getviscosity(T, type; η=1)
     
-    if type == "IsoviscousIsotropic"
+    if type == :IsoviscousIsotropic
         return Isoviscous{Isotropic}(float(η))
 
-    elseif type == "IsoviscousAnisotropic"
+    elseif type == :IsoviscousAnisotropic
         return Isoviscous{Anisotropic}(float(η))
 
-    elseif type == "TemperatureDependantIsotropic"
+    elseif type == :TemperatureDependantIsotropic
         return TemperatureDependant{Isotropic}(@. exp(13.8156*(0.5-T)))
         # return TemperatureDependant{Isotropic}(@. exp(-log(1e5)*T))
 
-    elseif type == "TemperatureDependantAnisotropic"
+    elseif type == :TemperatureDependantAnisotropic
         return TemperatureDependant{Anisotropic}(@. exp(13.8156*(0.5-T)))
         # return TemperatureDependant{Anisotropic}(@. exp(1e3^(-T)))
         
