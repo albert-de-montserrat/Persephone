@@ -86,14 +86,3 @@ function spmv!(A::AbstractSparseMatrix, x::DenseVector, out::DenseVector)
         end
     end
 end
-
-# # CSC x DenseVector when n >> m. Better to do x'*GG than GG'*x
-# function spmv_short(A::AbstractSparseMatrix, x::DenseVector)
-#     out = zeros(eltype(x), A.n)
-#     for col in 1:A.n
-#         for i in nzrange(A, col)
-#             @show out[col] += A.nzval[i]*x[i]
-#         end
-#     end
-#     out
-# end
