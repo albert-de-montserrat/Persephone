@@ -57,20 +57,43 @@ end
     end
 end 
 
-mynorm(r::Vector) = sqrt(mydot(r,r))
-
-function mydot(a::AbstractArray{T}, b::AbstractArray{T}) where {T}
-    n = zero(T)
-    @turbo warn_check_args=false for i in eachindex(a)
-        n += a[i]*b[i]
+# x + p*y -> y (vec+scalar*vec)
+function xpy!(y::Vector{T}, x::Vector{T}, p::T) where T
+    @tturbo for i in eachindex(y)
+        y[i] = x[i] + p * y[i]
     end
-    n
 end
 
-function mydot(a, b) where {T}
-    n = zero(eltype(a))
-    @turbo for i in eachindex(a)
-        n += a[i]*b[i]
+# out-of-place Sparse CSC matrix times dense vector
+function spmv(A::AbstractSparseMatrix, x::DenseVector)
+    out = zeros(eltype(x), A.m)
+    for col in 1:A.n
+        xi = x[col]
+        @tturbo for i in nzrange(A, col)
+            out[A.rowval[i]] += A.nzval[i]*xi
+        end
     end
-    n
+    out
 end
+
+# in-of-place Sparse CSC matrix times dense vector
+function spmv!(A::AbstractSparseMatrix, x::DenseVector, out::DenseVector)
+    fill!(out, zero(eltype(out)))
+    for col in 1:A.n            
+        xi = x[col]
+        @tturbo for i in nzrange(A, col)
+            out[A.rowval[i]] += A.nzval[i]*xi
+        end
+    end
+end
+
+# # CSC x DenseVector when n >> m. Better to do x'*GG than GG'*x
+# function spmv_short(A::AbstractSparseMatrix, x::DenseVector)
+#     out = zeros(eltype(x), A.n)
+#     for col in 1:A.n
+#         for i in nzrange(A, col)
+#             @show out[col] += A.nzval[i]*x[i]
+#         end
+#     end
+#     out
+# end

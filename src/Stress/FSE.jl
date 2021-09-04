@@ -9,6 +9,12 @@ end
 
 rebuild_FSE(vx1, vx2, vy1, vy2, a1, a2) = [FiniteStrainEllipsoid(vx1[i], vx2[i], vy1[i], vy2[i], a1[i], a2[i]) for i in CartesianIndices(a1)]
 
+function isotropic_lithosphere!(FSE,idx)
+    Threads.@threads for i in idx
+        @inbounds FSE[i] = FiniteStrainEllipsoid(1.0, 0.0, 0.0, 1.0, 1.0, 1.0)
+    end
+end
+
 function getFSE(F, FSE)
     @batch for iel in eachindex(F)
         local_FSE!(FSE, F, iel)
@@ -17,9 +23,9 @@ function getFSE(F, FSE)
 end 
 
 function local_FSE!(FSE, F, iel)
-    # Numerical eigenvectors calculation
+    # Compute FSE
     eigval, evect = eigen(F[iel] * F[iel]')
-    # Allocate FSE
+    # Fill FSE
     @inbounds FSE[iel] = FiniteStrainEllipsoid(
         evect[1,2]::Float64, # vx1
         evect[1,1]::Float64, # vx2
@@ -33,13 +39,10 @@ end
 function FSEips(U, particle_fields, particle_weights, particle_info, gr, coordinates, Δt)
     
     EL2NOD, θ, r = gr.e2n, coordinates.θ, coordinates.r
-    
-    # ============================================ SCALE Velocity
     Uscaled = U.*1
 
     # ============================================ MODEL AND BLOCKING PARAMETERS
     ndim = 2
-    # nvert = 3
     nip = 6
     nnodel = size(EL2NOD,1)
     nnodel = 3
@@ -48,11 +51,9 @@ function FSEips(U, particle_fields, particle_weights, particle_info, gr, coordin
     EL2DOF = Array{Int32}(undef,nUdofel,nel)
     EL2DOF[1:ndim:nUdofel,:] .= @. ndim*(EL2NOD[1:nnodel,:]-1) + 1
     EL2DOF[2:ndim:nUdofel,:] .= @. ndim*(EL2NOD[1:nnodel,:]-1) + 2
-    # nelblk = min(nel, 1200)
     
     # =========== PREPARE INTEGRATION POINTS & DERIVATIVES wrt LOCAL COORDINATES   
     ni, _, nn3 = Val(nip),Val(nnodel), Val(3)
-    # N,dNds,_ ,w_ip = _get_SF(ni,nn)
     _,_,dN3ds,_ = _get_SF(ni,nn3)
     
     npart = length(particle_weights)

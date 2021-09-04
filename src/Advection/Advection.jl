@@ -313,7 +313,6 @@ function advection!(particle_info,Δt)
     return particle_info
 end
 
-
 function particle_velocity(P::Vector{PINFO})
     np = length(P)
     uxp = Vector{Float64}(undef, np)

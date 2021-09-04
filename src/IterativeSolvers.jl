@@ -6,22 +6,24 @@
     itmin_Pat = 10
     itnum = 0
 
-    # fill!(U, 0.0)
-    # fill!(P, 0.0)
+    fill!(U, 0.0)
+    fill!(P, 0.0)
     nU = length(Rhs) 
     z = fill(0.0, nU)
     
     # forces resulting from pressure gradients
-    Rhs += GG*P
+    # Rhs += GG*P
+    Rhs += spmv(GG, P)
     # guess of the velocity field 
-    U,F = _CholeskyFactorizationSolve(U, KK, Rhs, ifree) # return factorization F to speed up next direct solvers
+    # U,F = _CholeskyFactorizationSolve(U, KK, Rhs, ifree) # return factorization F to speed up next direct solvers
     
-    # ps, A_pardiso = _MKLfactorize(KK, Rhs, ifree)
-    # _MKLsolve!(U, A_pardiso, ps, Rhs, ifree)
+    ps, A_pardiso = _MKLfactorize(KK, Rhs, ifree)
+    _MKLsolve!(U, A_pardiso, ps, Rhs, ifree)
 
     # initial pressure residual vector
-    GGtransp = GG'
-    r = -GG'*U  
+    GGtransp = sparse(GG')
+    r = -GGtransp *U  
+    # r = spmv(-GGtransp, U)
     rm0space!(r)
     Prms = mynorm(r) # norm of r_i
     tol = Prms * rtol_Pat
@@ -33,7 +35,7 @@
     d = _precondition(pc, MM, r) # precondition residual
     # d = _precondition(pc, r) # precondition residual
     q = deepcopy(d)  # define FIRST search direction q
-
+    rlast = similar(r)
     for itPat = 1:itmax_Pat
         itnum +=1
 
@@ -48,12 +50,13 @@
             (2) K z = y (TODO PARDISO direct solver)
             (3) Sq  = G'*z
         =============================================================#
-        y = GG*q        
-        _CholeskyWithFactorization!(z, F, y, ifree)
-        # _MKLsolve!(z, A_pardiso, ps, y, ifree)
+        # y = GG*q
+        y = spmv(GG, q)
+        # _CholeskyWithFactorization!(z, F, y, ifree)
+        _MKLsolve!(z, A_pardiso, ps, y, ifree)
         Sq = GGtransp*z
         qSq = mydot(q,Sq) # denominator to calculate alpha
-        rlast = copy(r) # needed for Polak-Ribiere version 1
+        copyto!(rlast, r) # needed for Polak-Ribiere version 1
         α = rd/qSq # steps size in direction q
         
         # Update solution and residual ------------------------------------ 
@@ -67,18 +70,18 @@
             break
         end
 
-        fill!(z,0.0)
+        fill!(z, 0.0)
 
-        # Pressure preconditioning (approximate error of current P)
         d  = _precondition(pc, r) # precondition residual
         # d = _precondition(pc, MM, r) # precondition rsidual
         # Make new search direction q S-orthogonal to all previous q's
         β  = mydot(r-rlast,d)/rd # Polak-Ribiere version 1        
-        q  = d + β*q # calculate NEW search direction
+        # q  = d + β*q # calculate NEW search direction
+        xpy!(q, d, β)
         
     end
 
-    # _MKLrelease!(ps)
+    _MKLrelease!(ps)
 
     return U,P
 
@@ -86,9 +89,21 @@ end # END PRECONDITIONED CONJUGATE GRADIENTS
 
 # Function takes out the mean of vector a
 # (thereby removes the constant pressure mode, i.e. the nullspace)
-@inline function rm0space!(a)
-    a .-= mean(a);
+function rm0space!(a)
+    m = vmean(a)
+    @tturbo for i in eachindex(a)
+        a[i] -= m
+    end
 end 
+
+function vmean(a::AbstractArray{T}) where T
+    m = zero(T)
+    n = length(a)
+    @tturbo for i in eachindex(a)
+        m += a[i]
+    end
+    m/n
+end
 
 # PRECONDITIONERS ================================================================
 @inline function _preconditioner(type, MM)
@@ -158,7 +173,7 @@ function _CG!(T,KK,Rhs,ifree)
     A  = KK[ifree,ifree]
     b  = Vector{Float64}(undef,length(ifree))
     @turbo for  i ∈ 1:length(ifree) 
-        b[i]   = Rhs[ifree[i]]        
+        b[i] = Rhs[ifree[i]]        
     end
     # Diagonal preconditioner
     p = DiagonalPreconditioner(A)
@@ -174,6 +189,3 @@ function _CG!(T,KK,Rhs,ifree)
     end  
     
 end
-
-
-# end # END OF MODULE

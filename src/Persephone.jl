@@ -10,8 +10,11 @@ using Preconditioners
 using HDF5
 using TimerOutputs
 using Polyester
+using Pardiso
 
 import Statistics: mean
+
+# LinearAlgebra.BLAS.set_num_threads(1)
 
 include("Grid/mesher.jl")
 export Grid_split1
@@ -53,6 +56,7 @@ export FiniteStrainEllipsoid
 export volume_integral
 export getFSE
 export rebuild_FSE
+export isotropic_lithosphere!
 
 include("Stress/StressCalculation.jl")
 export SymmetricTensor

@@ -12,10 +12,10 @@ function main()
     iscluster = false
     if iscluster
         path = "/storage2/unipd/navarro/AnnulusBenchmarks"
-        folder = "Anisotropic_1e4_2"
+        folder = "Isotropic_1e4"
     else
         path = "/home/albert/Desktop/output"
-        folder = "iso4_cubic"
+        folder = "aniso4_package"
     end
     filename = "file"
     iplot = Int32(0)
@@ -26,7 +26,7 @@ function main()
         MAKE GRID
     =========================================================================#
     split = 2
-    N = 3
+    N = 4
     if split == 1
         nr = Int(1 + 2^N)
         nθ = Int(12 * 2^N)
@@ -34,8 +34,8 @@ function main()
     else
         nr = Int(1+2^N)
         nθ = Int(12*2^N)
-        # nr = Int(1 + 32)
-        # nθ = Int(256)
+        nr = Int(1 + 32)
+        nθ = Int(256)
         gr = Grid(nθ, nr)
     end
     IDs = point_ids(gr)
@@ -52,11 +52,6 @@ function main()
     TBC = temperature_bcs(gr, IDs; Ttop = 0.0, Tbot = 1.0)
     UBC = velocity_bcs(gr, IDs; type="free slip")
     
-    #=========================================================================
-        SETUP BLAS THREADS:    
-    =========================================================================#
-    LinearAlgebra.BLAS.set_num_threads(1) 
-
     #=========================================================================
         Delete existing statistics file    
     =========================================================================#
@@ -96,6 +91,8 @@ function main()
     fixangles!(θ3)
     ipx, ipz = getips(gr.e2n, θ6, r6 )
     ix, iz = polar2cartesian(ipx, ipz)
+    transition = 2.12-0.2276
+    isotropic_idx = findall(ipz.> transition)
     IntC = [@inbounds(Point2D{Polar}(ipx[i], ipz[i])) for i in CartesianIndices(ipx)] # → ip coordinates
 
     #=========================================================================
@@ -139,10 +136,10 @@ function main()
     )
 
     ρ = state_equation(VarT.α, T)
-    η = getviscosity(T, viscosity_type, η = 1) # η = 1 for isotropic,  η = 1.81 for aniisotropic
+    η = getviscosity(T, viscosity_type, η = 1.81) # η = 1 for isotropic,  η = 1.81 for aniisotropic
     Valη = Val(η)
     g = 1e4
-    𝓒 = anisotropic_tensor(FSE, D, Valη, ipx)
+    𝓒 = anisotropic_tensor(FSE, D, Valη)
 
     #=========================================================================
         SOLVER INVARIANTS (FOR AN IMMUTABLE MESH):
@@ -235,7 +232,7 @@ function main()
 
             @timeit to "Finite Strain Ellipsoid" begin
                 FSE = getFSE(F, FSE)
-                # isotropic_lithosphere!(FSE, ipz)
+                # isotropic_lithosphere!(FSE, isotropic_idx)
             end
 
             #= Compute the viscous tensor =#

@@ -362,7 +362,7 @@ end
     PC
 end
 
-function addreject(T, F, gr, θThermal, rThermal, IC, particle_info, particle_weights, particle_fields; min_num_particles = 8)
+function addreject(T, F, gr, θThermal, rThermal, IC, particle_info, particle_weights, particle_fields; min_num_particles = 6)
     
     e2n, e2n_p1, neighbours0 = gr.e2n, gr.e2n_p1, gr.neighbours
     

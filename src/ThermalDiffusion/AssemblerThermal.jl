@@ -54,6 +54,11 @@ function solveDiffusion_threaded(
 
         # Solve temperature
         @timeit to "Solve" T[tfree] .= MT[tfree, tfree] \ FT[tfree]
+        # @timeit to "Solve" begin 
+        #     ps, A_pardiso = _MKLfactorize(MT, FT, tfree)
+        #     _MKLsolve!(T, A_pardiso, ps, FT, tfree)
+        #     _MKLrelease!(ps)
+        # end
 
         # Temperature increment
         ΔT = @tturbo T .- T0

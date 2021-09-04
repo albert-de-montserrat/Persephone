@@ -295,47 +295,43 @@ end
 
 end
 
+function _Fij_Rk4(Δt, ∂Ux∂xᵢ, ∂Ux∂zᵢ, ∂Uz∂xᵢ, ∂Uz∂zᵢ, Fxx, Fxz, Fzx, Fzz)
+    kxx = Δt*(∂Ux∂xᵢ*Fxx + ∂Ux∂zᵢ*Fzx)
+    kxz = Δt*(∂Ux∂xᵢ*Fxz + ∂Ux∂zᵢ*Fzz)
+    kzx = Δt*(∂Uz∂xᵢ*Fxx + ∂Uz∂zᵢ*Fzx)
+    kzz = Δt*(∂Uz∂xᵢ*Fxz + ∂Uz∂zᵢ*Fzz)
+    return kxx, kxz, kzx, kzz
+end
+
 @inline function _Fij_Rk4!( Fxx_blk, Fzz_blk, Fxz_blk, Fzx_blk,
     ∂Ux∂x, ∂Uz∂z, ∂Ux∂z, ∂Uz∂x,
     Δt)
-
+    
     one_sixth = 1/6
     @turbo for i in axes(Fxx_blk,1)
        # cache them out
         ∂Ux∂xᵢ, ∂Ux∂zᵢ, ∂Uz∂xᵢ, ∂Uz∂zᵢ = ∂Ux∂x[i], ∂Ux∂z[i], ∂Uz∂x[i], ∂Uz∂z[i]
         Fxx, Fxz, Fzx, Fzz = Fxx_blk[i], Fxz_blk[i], Fzx_blk[i], Fzz_blk[i]
         # 1st step
-        k1xx = Δt*(∂Ux∂xᵢ*Fxx + ∂Ux∂zᵢ*Fzx)  
-        k1xz = Δt*(∂Ux∂xᵢ*Fxz + ∂Ux∂zᵢ*Fzz)  
-        k1zx = Δt*(∂Uz∂xᵢ*Fxx + ∂Uz∂zᵢ*Fzx)  
-        k1zz = Δt*(∂Uz∂xᵢ*Fxz + ∂Uz∂zᵢ*Fzz)  
+        k1xx, k1xz, k1zx, k1zz = _Fij_Rk4(Δt, ∂Ux∂xᵢ, ∂Ux∂zᵢ, ∂Uz∂xᵢ, ∂Uz∂zᵢ, Fxx, Fxz, Fzx, Fzz)
         # 2nd step
-        Fxxi = (Fxx + k1xx*0.5)
-        Fxzi = (Fxz + k1xz*0.5)
-        Fzxi = (Fzx + k1zx*0.5)
-        Fzzi = (Fzz + k1zz*0.5)
-        k2xx = Δt*(∂Ux∂xᵢ*Fxxi + ∂Ux∂zᵢ*Fzxi)
-        k2xz = Δt*(∂Ux∂xᵢ*Fxzi + ∂Ux∂zᵢ*Fzzi)
-        k2zx = Δt*(∂Uz∂xᵢ*Fxxi + ∂Uz∂zᵢ*Fzxi)
-        k2zz = Δt*(∂Uz∂xᵢ*Fxzi + ∂Uz∂zᵢ*Fzzi)
+        Fxxi = Fxx + k1xx*0.5
+        Fxzi = Fxz + k1xz*0.5
+        Fzxi = Fzx + k1zx*0.5
+        Fzzi = Fzz + k1zz*0.5
+        k2xx, k2xz, k2zx, k2zz = _Fij_Rk4(Δt, ∂Ux∂xᵢ, ∂Ux∂zᵢ, ∂Uz∂xᵢ, ∂Uz∂zᵢ, Fxx, Fxz, Fzx, Fzz)
         # 3rd step
         Fxxi = Fxx + k2xx*0.5
         Fxzi = Fxz + k2xz*0.5
         Fzxi = Fzx + k2zx*0.5
         Fzzi = Fzz + k2zz*0.5
-        k3xx = Δt*(∂Ux∂xᵢ*Fxxi + ∂Ux∂zᵢ*Fzxi)
-        k3xz = Δt*(∂Ux∂xᵢ*Fxzi + ∂Ux∂zᵢ*Fzzi)
-        k3zx = Δt*(∂Uz∂xᵢ*Fxxi + ∂Uz∂zᵢ*Fzxi)
-        k3zz = Δt*(∂Uz∂xᵢ*Fxzi + ∂Uz∂zᵢ*Fzzi)
+        k3xx, k3xz, k3zx, k3zz = _Fij_Rk4(Δt, ∂Ux∂xᵢ, ∂Ux∂zᵢ, ∂Uz∂xᵢ, ∂Uz∂zᵢ, Fxx, Fxz, Fzx, Fzz)
         # 4th step
         Fxxi = Fxx + k3xx
         Fxzi = Fxz + k3xz
         Fzxi = Fzx + k3zx
         Fzzi = Fzz + k3zz
-        k4xx = Δt*(∂Ux∂xᵢ*Fxxi + ∂Ux∂zᵢ*Fzxi)
-        k4xz = Δt*(∂Ux∂xᵢ*Fxzi + ∂Ux∂zᵢ*Fzzi)
-        k4zx = Δt*(∂Uz∂xᵢ*Fxxi + ∂Uz∂zᵢ*Fzxi)
-        k4zz = Δt*(∂Uz∂xᵢ*Fxzi + ∂Uz∂zᵢ*Fzzi)
+        k4xx, k4xz, k4zx, k4zz = _Fij_Rk4(Δt, ∂Ux∂xᵢ, ∂Ux∂zᵢ, ∂Uz∂xᵢ, ∂Uz∂zᵢ, Fxx, Fxz, Fzx, Fzz)
         # last step
         Fxz_blk[i] += (k1xz + 2*(k2xz + k3xz) + k4xz)*one_sixth
         Fxx_blk[i] += (k1xx + 2*(k2xx + k3xx) + k4xx)*one_sixth
