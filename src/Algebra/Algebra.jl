@@ -89,9 +89,19 @@ end
 
 mynorm(r::Vector) = sqrt(mydot(r,r))
 
+# Dot product
 function mydot(a::AbstractArray{T}, b::AbstractArray{T}) where {T}
     n = zero(T)
     @turbo for i in eachindex(a)
+        n += a[i]*b[i]
+    end
+    n
+end
+
+# Threaded dot product
+function mydott(a::AbstractArray{T}, b::AbstractArray{T}) where {T}
+    n = zero(T)
+    @tturbo for i in eachindex(a)
         n += a[i]*b[i]
     end
     n

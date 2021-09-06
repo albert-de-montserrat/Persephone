@@ -14,18 +14,13 @@ function thermal_parameters(;
     ThermalParameters(κ, α, Cp, dQdT)
 end
 
-function init_temperature(gr, IDs)
+function init_temperature(gr, IDs; type = :harmonic)
     
     θ = gr.θ
     r = gr.r
     s = @. (2.22-r)/(2.22-1.22)
     
     Ttop, Tbot = 0.0, 1.0
-    
-    # # Linear temperature
-    # m = Ttop - Tbot
-    # b = Ttop - 2.22m
-    # T = @. m*z+b 
     
     # # Thermal perturbation
     # zsize = zmax-zmin
@@ -35,22 +30,18 @@ function init_temperature(gr, IDs)
     # T .+= δT
     # # T = @. 1 - (1.12*(ival/(2.22-ival)) + δT)
 
-    # Thermal perturbation - Jeff
-    y44 = @. 1.0/8.0*√(35.0/π)*cos(4.0*θ)
-    δT = @. 0.2*y44*sin(π*(1-s))
-    # T = @. (round(1.22*(s/(2.22-s)), digits=3) + δT)
-    T = @. 1.22*s/(2.22-s) + δT
+    if type == :harmonic
+        # Harmonic hermal perturbation
+        y44 = @. 1.0/8.0*√(35.0/π)*cos(4.0*θ)
+        δT = @. 0.2*y44*sin(π*(1-s))
+        T = @. 1.22*s/(2.22-s) + δT
 
-    # A, N = 0.1, 4
-    # δT = @. A*s*(1-s)*cos(N*x)
-    # T = @. s + δT 
+    elseif type == :random
+        # Linear temperature
+        δT = s .* (1 .+ (rand(length(s)).-0.5).*0.01 )
+        T = s .+ δT
 
-    # # Random noise
-    # max_percent = 0.02
-    # δT = max_percent*T.*(rand(length(T)).-0.5)
-
-    # add perturbation
-    # T .+= δT
+    end
     
     fixT!(T, Ttop , Tbot, IDs)
     applybounds!(T, Tbot, Ttop)

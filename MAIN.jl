@@ -104,7 +104,7 @@ function main()
     # Allocate nodal velocities
     Ucartesian, Upolar = initvelocity(gr.nnod)
     # Initialise temperature @ nodes
-    T = init_temperature(gr, IDs)
+    T = init_temperature(gr, IDs, type = :random)
     ΔT = similar(T)
     # Initialise temperature @ particles
     init_particle_temperature!(particle_fields, particle_info)
