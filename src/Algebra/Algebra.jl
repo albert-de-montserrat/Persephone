@@ -86,3 +86,13 @@ function spmv!(A::AbstractSparseMatrix, x::DenseVector, out::DenseVector)
         end
     end
 end
+
+mynorm(r::Vector) = sqrt(mydot(r,r))
+
+function mydot(a::AbstractArray{T}, b::AbstractArray{T}) where {T}
+    n = zero(T)
+    @turbo for i in eachindex(a)
+        n += a[i]*b[i]
+    end
+    n
+end
