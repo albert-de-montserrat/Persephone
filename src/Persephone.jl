@@ -14,7 +14,7 @@ using Pardiso
 
 import Statistics: mean
 
-# LinearAlgebra.BLAS.set_num_threads(1)
+LinearAlgebra.BLAS.set_num_threads(1)
 
 include("Grid/mesher.jl")
 export Grid_split1
