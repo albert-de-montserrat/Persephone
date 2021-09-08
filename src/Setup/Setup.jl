@@ -42,9 +42,9 @@ end
 
 function init_particle_temperature!(particle_fields, particle_info; type = :harmonic)
     
-    x = [particle_info[i].CPolar.x for i in eachindex(particle_info)]
-    z = [particle_info[i].CPolar.z for i in eachindex(particle_info)]
-    s = @. (2.22-z)/(2.22-1.22)
+    θ = [particle_info[i].CPolar.x for i in eachindex(particle_info)]
+    r = [particle_info[i].CPolar.z for i in eachindex(particle_info)]
+    s = @. (2.22-r)/(2.22-1.22)
  
     if type == :harmonic
         # Harmonic hermal perturbation
