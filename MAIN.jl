@@ -22,7 +22,7 @@ function main()
         MAKE GRID
     =========================================================================#
     split = 2
-    N = 4
+    N = 3
     if split == 1
         nr = Int(1 + 2^N)
         nθ = Int(12 * 2^N)
@@ -30,8 +30,8 @@ function main()
     else
         nr = Int(1+2^N)
         nθ = Int(12*2^N)
-        nr = Int(1 + 32)
-        nθ = Int(256)
+        # nr = Int(1 + 32)
+        # nθ = Int(256)
         gr = Grid(nθ, nr)
     end
     IDs = point_ids(gr)
@@ -109,7 +109,7 @@ function main()
     # Initialise temperature @ particles
     init_particle_temperature!(particle_fields, particle_info)
 
-    viscosity_type = :IsoviscousIsotropic
+    viscosity_type = :IsoviscousAnisotropic
     #= Options:
         (*) "IsoviscousIsotropic"
         (*) "TemperatureDependantIsotropic"
@@ -172,7 +172,7 @@ function main()
     Time = 0.0
     T0 = deepcopy(T)
 
-    for iplot in 1:250
+    for iplot in 1:1
         for _ in 1:50
             reset_timer!(to)
 

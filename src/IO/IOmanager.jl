@@ -116,7 +116,6 @@ function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, nθ, nr,
     # Prepare output variables
     Uθ,Ur = getvelocity(Upolar)
     Ux,Uz = getvelocity(Ucartesian)
-    x,z = getvelocity(GlobC)
 
     # Prepare F
     Fxx = [F[i,j][1,1] for i in axes(F,1), j in axes(F,2) ]
