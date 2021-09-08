@@ -14,8 +14,8 @@ function setup_output(path, folder)
     return OUT, iplot
 end
 
-function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, EL2NOD, GlobC, 
-    particle_fields, particle_info, time2save::Float64, ::Val{Isotropic}) 
+function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, nθ, 
+    nr, particle_fields, particle_info, time2save::Float64, ::Val{Isotropic}) 
 
     # unpack
     path, folder, filename, iplot = 
@@ -42,7 +42,6 @@ function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, EL2NOD, Glob
     # Prepare output variables
     Uθ,Ur = getvelocity(Upolar)
     Ux,Uz = getvelocity(Ucartesian)
-    x,z = getvelocity(GlobC)
 
     # Unpack particle info 
     np = length(particle_info)
@@ -64,9 +63,8 @@ function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, EL2NOD, Glob
         Time["t"] = time2save
 
         # mesh variables
-        MESH["x"] = x                     # create a scalar dataset inside the group
-        MESH["z"] = z                     # create a scalar dataset inside the group
-        MESH["EL2NOD"] = EL2NOD
+        MESH["nθ"] = nθ                    # create a scalar dataset inside the group
+        MESH["nr"] = nr                     # create a scalar dataset inside the group
         
         # physical variables
         VAR["Ux"] = Ux
@@ -104,7 +102,7 @@ function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, EL2NOD, Glob
     end
 end
 
-function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, EL2NOD, GlobC, 
+function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, nθ, nr, 
     particle_fields, particle_info, time2save::Float64, ::Val{Anisotropic}) 
 
     # unpack
@@ -154,10 +152,9 @@ function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, EL2NOD, Glob
         Time["t"] = time2save
 
         # mesh variables
-        MESH["x"] = x                     # create a scalar dataset inside the group
-        MESH["z"] = z                     # create a scalar dataset inside the group
-        MESH["EL2NOD"] = EL2NOD
-        
+        MESH["nθ"] = nθ                    # create a scalar dataset inside the group
+        MESH["nr"] = nr                     # create a scalar dataset inside the group
+       
         # physical variables
         VAR["Ux"] = Ux
         VAR["Uz"] = Uz
