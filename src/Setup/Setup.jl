@@ -40,17 +40,23 @@ function init_temperature(gr, IDs; type = :harmonic)
     return T
 end
 
-function init_particle_temperature!(particle_fields, particle_info)
+function init_particle_temperature!(particle_fields, particle_info; type = :harmonic)
     
     x = [particle_info[i].CPolar.x for i in eachindex(particle_info)]
     z = [particle_info[i].CPolar.z for i in eachindex(particle_info)]
     s = @. (2.22-z)/(2.22-1.22)
  
-    # Thermal perturbation - Jeff
-    ival = s
-    y44 = @. 1.0/8.0*√(35.0/π)*cos(4.0*x);
-    δT = @. 0.2*y44*sin(π*(1-ival))
-    particle_fields.T .= @. (1.22*(ival/(2.22-ival)) + δT)
+    if type == :harmonic
+        # Harmonic hermal perturbation
+        y44 = @. 1.0/8.0*√(35.0/π)*cos(4.0*θ)
+        δT = @. 0.2*y44*sin(π*(1-s))
+        particle_fields.T = @. 1.22*s/(2.22-s) + δT
+
+    elseif type == :random
+        # Linear temperature with random perturbation
+        particle_fields.T = s .* (1 .+ (rand(length(s)).-0.5).*0.01 )
+
+    end
 
 end
 

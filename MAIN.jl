@@ -15,14 +15,14 @@ function main()
     else
         path = "/home/albert/Desktop/output"
     end
-    folder = "aniso4_package"
+    folder = "IsoRandom"
     OUT, iplot = setup_output(path, folder)
 
     #=========================================================================
         MAKE GRID
     =========================================================================#
     split = 2
-    N = 3
+    N = 4
     if split == 1
         nr = Int(1 + 2^N)
         nθ = Int(12 * 2^N)
@@ -109,7 +109,7 @@ function main()
     # Initialise temperature @ particles
     init_particle_temperature!(particle_fields, particle_info)
 
-    viscosity_type = :IsoviscousAnisotropic
+    viscosity_type = :IsoviscousIsotropic
     #= Options:
         (*) "IsoviscousIsotropic"
         (*) "TemperatureDependantIsotropic"
@@ -172,8 +172,9 @@ function main()
     Time = 0.0
     T0 = deepcopy(T)
 
-    for iplot in 1:1
-        for _ in 1:50
+    for iplot in 1:100
+
+        for _ in 1:1
             reset_timer!(to)
 
             #= Update material properties =#
@@ -390,6 +391,7 @@ function main()
             Val(η),
         )
         println(" ...done!")
+
     end
 end
 
