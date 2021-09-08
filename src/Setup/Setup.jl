@@ -21,14 +21,6 @@ function init_temperature(gr, IDs; type = :harmonic)
     s = @. (2.22-r)/(2.22-1.22)
     
     Ttop, Tbot = 0.0, 1.0
-    
-    # # Thermal perturbation
-    # zsize = zmax-zmin
-    # ival = @. z/zsize
-    # y44 = [3/16 * sqrt(35/π)*cos(4GlobC[i].x) for i in axes(GlobC,1)]
-    # δT = [0.1 * y44[i] * sin(π*(1.12-GlobC[i].z)) for i in axes(GlobC,1)]
-    # T .+= δT
-    # # T = @. 1 - (1.12*(ival/(2.22-ival)) + δT)
 
     if type == :harmonic
         # Harmonic hermal perturbation
@@ -37,7 +29,7 @@ function init_temperature(gr, IDs; type = :harmonic)
         T = @. 1.22*s/(2.22-s) + δT
 
     elseif type == :random
-        # Linear temperature
+        # Linear temperature with random perturbation
         δT = s .* (1 .+ (rand(length(s)).-0.5).*0.01 )
         T = s .+ δT
 
