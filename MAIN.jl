@@ -107,7 +107,7 @@ function main()
     T = init_temperature(gr, IDs, type = :random)
     ΔT = similar(T)
     # Initialise temperature @ particles
-    init_particle_temperature!(particle_fields, particle_info)
+    init_particle_temperature!(particle_fields, particle_info, type = :random)
 
     viscosity_type = :IsoviscousIsotropic
     #= Options:
