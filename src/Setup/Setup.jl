@@ -30,8 +30,7 @@ function init_temperature(gr, IDs; type = :harmonic)
 
     elseif type == :random
         # Linear temperature with random perturbation
-        δT = s .* (1 .+ (rand(length(s)).-0.5).*0.01 )
-        T = s .+ δT
+        T = s .* (1 .+ (rand(length(s)).-0.5).*0.01 )
 
     end
     

@@ -85,13 +85,6 @@ function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, nθ,
         VAR["y1"] = y1
         VAR["y2"] = y2
 
-        # VAR["nu11"] = 𝓒.η11
-        # VAR["nu33"] = 𝓒.η33
-        # VAR["nu55"] = 𝓒.η55
-        # VAR["nu13"] = 𝓒.η13
-        # VAR["nu15"] = 𝓒.η15
-        # VAR["nu35"] = 𝓒.η35
-
         # particle variables
         PART["x"] = xp
         PART["z"] = zp
@@ -103,7 +96,7 @@ function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, nθ,
 end
 
 function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, nθ, nr, 
-    particle_fields, particle_info, time2save::Float64, ::Val{Anisotropic}) 
+    particle_fields, particle_info, time2save, ::Val{Anisotropic}) 
 
     # unpack
     path, folder, filename, iplot = 
