@@ -15,13 +15,15 @@ function solveDiffusion_threaded(
     T,
     T0,
     TBC,
+    cuda,
     to,
 )
 
     ∂Ωt = TBC.Ω
     tfix = TBC.vfix
     tfree = TBC.ifree
-    T0 .= deepcopy(T)
+    # T0 .= deepcopy(T)
+    copyto!(T0,T)
            
     @timeit to "Thermal diffusion threaded" begin
         # Reset Matrices
@@ -53,7 +55,18 @@ function solveDiffusion_threaded(
         end
 
         # Solve temperature
-        @timeit to "Solve" T[tfree] .= MT[tfree, tfree] \ FT[tfree]
+        if cuda == :off
+            @timeit to "Solve" T[tfree] .= MT[tfree, tfree] \ FT[tfree]
+        
+        else
+            @timeit to "Solve" sol, = Krylov.cg(
+                CuSparseMatrixCSC(MT[tfree, tfree]), 
+                CuVector(FT[tfree])
+            )
+            @timeit to "Fill T" @tturbo T[tfree] .=  Array(sol)
+        
+        end
+
         # @timeit to "Solve" begin 
         #     ps, A_pardiso = _MKLfactorize(MT, FT, tfree)
         #     _MKLsolve!(T, A_pardiso, ps, FT, tfree)

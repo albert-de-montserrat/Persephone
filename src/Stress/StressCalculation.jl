@@ -62,13 +62,13 @@ function stress(U, T, F, 𝓒, τ, ε, EL2NOD, theta, r, η, PhaseID, Δt)
     Fxx_blk,Fzz_blk,Fxz_blk,Fzx_blk = 
         similar(τxx_blk),similar(τxx_blk), similar(τxx_blk),similar(τxx_blk)
     # -- deformation gradient 
-    F0xx_blk,F0zz_blk,F0xz_blk,F0zx_blk = 
-        similar(τxx_blk),similar(τxx_blk), similar(τxx_blk),similar(τxx_blk)
+    # F0xx_blk,F0zz_blk,F0xz_blk,F0zx_blk = 
+    #     similar(τxx_blk),similar(τxx_blk), similar(τxx_blk),similar(τxx_blk)
     # -- velocity partial derivatives
     ∂Ux∂x,∂Uz∂z,∂Ux∂z,∂Uz∂x =
         similar(τxx_blk),similar(τxx_blk), similar(τxx_blk),similar(τxx_blk)
     # -- Temperature gradient
-    ∂T∂x, ∂T∂z = similar(τxx_blk), similar(τxx_blk)
+    # ∂T∂x, ∂T∂z = similar(τxx_blk), similar(τxx_blk)
 
     #=========================================================================
     BLOCK LOOP - MATRIX COMPUTATION
@@ -105,15 +105,11 @@ function stress(U, T, F, 𝓒, τ, ε, EL2NOD, theta, r, η, PhaseID, Δt)
             _getblock!(Fxz_blk,F,il:iu,ip,1,2)
             _getblock!(Fzx_blk,F,il:iu,ip,2,1)
             _getblock!(Fzz_blk,F,il:iu,ip,2,2)
-            F0xx_blk = deepcopy(Fxx_blk)
-            F0xz_blk = deepcopy(Fxz_blk)
-            F0zx_blk = deepcopy(Fzx_blk)
-            F0zz_blk = deepcopy(Fzz_blk)
 
             # #=======================================================================
             # PROPERTIES OF ELEMENTS AT ip-TH EVALUATION POINT
             # =======================================================================#
-            η_blk = _element_viscosity(η,EL2NOD,PhaseID,il:iu,N_ip)
+            # η_blk = _element_viscosity(η,EL2NOD,PhaseID,il:iu,N_ip)
 
             #===========================================================================================================
             # CALCULATE 2nd JACOBIAN (FROM CARTESIAN TO POLAR COORDINATES --> curved edges), ITS DETERMINANT AND INVERSE
@@ -123,17 +119,17 @@ function stress(U, T, F, 𝓒, τ, ε, EL2NOD, theta, r, η, PhaseID, Δt)
             th_ip = gemmt(VCOORD_th', N_ip')
             r_ip = gemmt(VCOORD_r', N_ip') # VCOORD_r' * N_ip'
 
-            @inbounds  _derivative_weights!(dNds[ip],ω,dNdx,dNdy,w_ip[ip],th_ip,r_ip,sin_ip,cos_ip,
+            @inbounds _derivative_weights!(dNds[ip],ω,dNdx,dNdy,w_ip[ip],th_ip,r_ip,sin_ip,cos_ip,
                 R_21,R_31,Th_21,Th_31, detJ_PL, invJx_double, invJz_double)
                 
             _velocityderivatives!(∂Ux∂x, ∂Uz∂z, ∂Ux∂z, ∂Uz∂x,
                                   εxx_blk, εzz_blk, εxz_blk,
                                   B, dNdx, dNdy,U_blk) 
 
-            _stress!(τxx_blk, τzz_blk, τxz_blk,
-                     εxx_blk, εzz_blk, εxz_blk,
-                     η_blk, 𝓒, Val(η),
-                     il:iu,ip)
+            # _stress!(τxx_blk, τzz_blk, τxz_blk,
+            #          εxx_blk, εzz_blk, εxz_blk,
+            #          η_blk, 𝓒, Val(η),
+            #          il:iu,ip)
             
             _Fij_Rk4!(Fxx_blk, Fzz_blk, Fxz_blk, Fzx_blk,
                       ∂Ux∂x, ∂Uz∂z, ∂Ux∂z, ∂Uz∂x,
@@ -295,7 +291,7 @@ end
 
 end
 
-function _Fij_Rk4(Δt, ∂Ux∂xᵢ, ∂Ux∂zᵢ, ∂Uz∂xᵢ, ∂Uz∂zᵢ, Fxx, Fxz, Fzx, Fzz)
+@inline function _Fij_Rk4(Δt, ∂Ux∂xᵢ, ∂Ux∂zᵢ, ∂Uz∂xᵢ, ∂Uz∂zᵢ, Fxx, Fxz, Fzx, Fzz)
     kxx = Δt*(∂Ux∂xᵢ*Fxx + ∂Ux∂zᵢ*Fzx)
     kxz = Δt*(∂Ux∂xᵢ*Fxz + ∂Ux∂zᵢ*Fzz)
     kzx = Δt*(∂Uz∂xᵢ*Fxx + ∂Uz∂zᵢ*Fzx)
@@ -359,7 +355,7 @@ end
                               εxx_blk, εzz_blk, εxz_blk,
                               els,ip )
     c = Int32(0)
-    @inbounds @simd for i in els
+    @inbounds for i in els
         c += one(c)
         # -- Deformation gradient Fij
         F[i,ip] = @SMatrix [Fxx_blk[c] Fxz_blk[c]; Fzx_blk[c] Fzz_blk[c]]

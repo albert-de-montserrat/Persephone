@@ -6,11 +6,15 @@ using SuiteSparse
 using SparseArrays
 using LoopVectorization
 using IterativeSolvers
+using Krylov
+using CUDA
+using CUDA.CUSPARSE
 using Preconditioners
 using HDF5
 using TimerOutputs
 using Polyester
 using Pardiso
+using Fabrics
 
 import Statistics: mean
 
@@ -48,6 +52,7 @@ include("Stokes/StokesSolver.jl")
 export solveStokes
 export initvelocity
 export rotation_matrix
+export assembly_stokes_cylindric
 
 include("ThermalDiffusion/ThermalSolver.jl")
 

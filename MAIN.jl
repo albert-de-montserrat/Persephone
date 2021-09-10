@@ -1,4 +1,3 @@
-# include("Mixer.jl")
 import Pkg; Pkg.activate(".")
 using Persephone
 using LinearAlgebra, TimerOutputs
@@ -15,7 +14,7 @@ function main()
     else
         path = "/home/albert/Desktop/output"
     end
-    folder = "IsoRandom"
+    folder = "AnisoRandom"
     OUT, iplot = setup_output(path, folder)
 
     #=========================================================================
@@ -30,8 +29,8 @@ function main()
     else
         nr = Int(1+2^N)
         nθ = Int(12*2^N)
-        # nr = Int(1 + 32)
-        # nθ = Int(256)
+        nr = Int(1 + 32)
+        nθ = Int(256)
         gr = Grid(nθ, nr)
     end
     IDs = point_ids(gr)
@@ -61,8 +60,9 @@ function main()
     #=========================================================================
         GET DEM STRUCTURE:    
     =========================================================================#
-    fname = joinpath("DEM", "DEM_1e-3_vol20_new3.h5")
-    D = getDEM(fname)
+    dem_file = joinpath("DEM", "DEM_1e-3_vol20_new3.h5")
+    Δη, ϕ = 1e-3, 0.2
+    D = getDEM(dem_file, Δη, ϕ)
 
     #=========================================================================
         FIX θ OF ELEMENTS CROSSING π and reshape also r (i.e. periodic boundaries)
@@ -109,7 +109,7 @@ function main()
     # Initialise temperature @ particles
     init_particle_temperature!(particle_fields, particle_info, type = :random)
 
-    viscosity_type = :IsoviscousIsotropic
+    viscosity_type = :IsoviscousAnisotropic
     #= Options:
         (*) "IsoviscousIsotropic"
         (*) "TemperatureDependantIsotropic"
@@ -185,7 +185,8 @@ function main()
 
             #=
                 Stokes solver using preconditioned-CG 
-            =#                
+            =#       
+            reset_timer!(to)
             Ucartesian, Upolar, U, Ucart, P, to = solveStokes(
                 U,
                 P,
@@ -204,8 +205,8 @@ function main()
                 GGidx,
                 MMidx,
                 to,
-            )
-
+            );
+            to
             println("min:max Uθ", extrema(@views U[1:2:end]))
             println("mean speed  ", mean(@views @. (√(U[1:2:end]^2 + U[2:2:end]^2))))
 
@@ -215,15 +216,15 @@ function main()
                 #=
                     Stress-Strain postprocessor
                 =#
-                F, τ, ε, τII, εII = stress(
+                F, τ, ε, = stress(
                     Ucart, T, F, 𝓒, τ, ε, gr.e2n, θStokes, rStokes, η, PhaseID, Δt
                 )
                 # shear_heating = shearheating(τ, ε)
             end
 
             @timeit to "Finite Strain Ellipsoid" begin
+                isotropic_lithosphere!(F, isotropic_idx)
                 FSE = getFSE(F, FSE)
-                # isotropic_lithosphere!(FSE, isotropic_idx)
             end
 
             #= Compute the viscous tensor =#
@@ -251,6 +252,7 @@ function main()
                 T,
                 T0,
                 TBC,
+                :on,
                 to,
             )
 

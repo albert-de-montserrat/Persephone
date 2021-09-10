@@ -1,4 +1,3 @@
-# PRECONDITIONED CONJUGATE GRADIENTS ================================================================
 @inline  function StokesPcCG(U,P,KK,MM,GG,Rhs,ifree)
     
     rtol_Pat = 1e-8
@@ -6,34 +5,39 @@
     itmin_Pat = 10
     itnum = 0
 
+    # allocate some stuff
     fill!(U, 0.0)
     fill!(P, 0.0)
     nU = length(Rhs) 
     z = fill(0.0, nU)
     
     # forces resulting from pressure gradients
-    # Rhs += GG*P
     Rhs += spmv(GG, P)
+
     # guess of the velocity field 
     # U,F = _CholeskyFactorizationSolve(U, KK, Rhs, ifree) # return factorization F to speed up next direct solvers
-    
     ps, A_pardiso = _MKLfactorize(KK, Rhs, ifree)
     _MKLsolve!(U, A_pardiso, ps, Rhs, ifree)
+
+    # sol, = Krylov.cg(
+    #     CuSparseMatrixCSC(KK[tfree, tfree]), 
+    #     CuVector(Rhs[tfree])
+    # ) 
+    # @tturbo T[tfree] .=  Array(sol)
 
     # initial pressure residual vector
     GGtransp = sparse(GG')
     r = -GGtransp *U  
-    # r = spmv(-GGtransp, U)
     rm0space!(r)
     Prms = mynorm(r) # norm of r_i
     tol = Prms * rtol_Pat
     # get preconditioner
     MM, pc = _preconditioner("jacobi", MM)
-    # MM, pc = _preconditioner("lumped", MM)
+    MM, pc = _preconditioner("lumped", MM)
     
-    # Begin of Patera pressure iterations -------------------------------
-    d = _precondition(pc, MM, r) # precondition residual
-    # d = _precondition(pc, r) # precondition residual
+    # Begin of Patera pressure iterations 
+    # d = _precondition(pc, MM, r) # precondition residual
+    d = _precondition(pc, r) # precondition residual
     q = deepcopy(d)  # define FIRST search direction q
     rlast = similar(r)
     for itPat = 1:itmax_Pat
@@ -54,16 +58,23 @@
         y = spmv(GG, q)
         # _CholeskyWithFactorization!(z, F, y, ifree)
         _MKLsolve!(z, A_pardiso, ps, y, ifree)
+
+        # sol, = Krylov.cg(
+        #     CuSparseMatrixCSC(KK[tfree, tfree]), 
+        #     CuVector(y[tfree])
+        # ) 
+        # @tturbo z[tfree] .=  Array(sol)
+        
         Sq = GGtransp*z
         qSq = mydot(q,Sq) # denominator to calculate alpha
         copyto!(rlast, r) # needed for Polak-Ribiere version 1
         α = rd/qSq # steps size in direction q
         
-        # Update solution and residual ------------------------------------ 
+        # Update solution and residual  
         _updatesolution!(P,U,r,q,z,Sq,α)
-
+        # remove nullspace
         rm0space!(r)
-        # Check convergence -----------------------------------------------
+        # Check convergence 
         Prrms = mynorm(r)
         if Prrms < tol && itPat>=itmin_Pat
             println("\n", itnum," CG iterations\n")

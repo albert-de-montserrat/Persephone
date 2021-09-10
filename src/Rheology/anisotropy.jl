@@ -1,16 +1,10 @@
-mutable struct StiffnessTensor{T}
+struct StiffnessTensor{T}
     η11::Matrix{T}
     η33::Matrix{T}
     η55::Matrix{T}
     η13::Matrix{T}
     η15::Matrix{T}
     η35::Matrix{T}
-end
-
-struct Parameterisation{T}
-    ζ::T
-    ξ::T
-    χ::T
 end
 
 """
@@ -30,15 +24,16 @@ end
     w = viscosity cut-off
 """
 struct DEM 
-    𝓒::Array{Float64,2}  
-    a::Array{Float64,2} 
-    ϕ::Vector{Float64} 
-    w::Float64 
+    𝓒::Matrix{Float64}
+    a::Matrix{Float64}
+    ϕ::Vector{Float64}
+    w::Float64
     a1a2_blk::Vector{Float64}
     a2a3_blk::Vector{Float64}
     permutation_blk::Vector{Int64} 
     sblk::Int64
     nblk::Int64
+    parameterization::ParameterizationWeak{Float64}
 end
 
 """
@@ -55,56 +50,14 @@ function DEMloader(fname::String)
 end
 
 """
-    weakening(Δη::Float64, ϕ::Number) 
-        Compute viscosity cutoff as function of volume fraction
-"""
-function weakening(Δη::Float64, ϕ0::Real)
-    ϕ = ifelse(ϕ0 < 1, ϕ0, ϕ0/100)
-
-    if ϕ == 0.10
-        ζ =  1.111
-        ξ =  1.109
-        χ = -1.597
-        θ =  0.3754
-        ψ =  0.699
-        λ =  0.6834
-        
-    elseif ϕ == 0.20 
-        ζ =  43.646559
-        ξ = -42.907958
-        χ =  0.1
-        θ =  0.261095
-        ψ =  0.984129
-        λ =  1.0
-        
-    elseif ϕ == 0.30 
-        ζ =  40.628095
-        ξ = -39.823767
-        χ =  0.1
-        θ =  0.196188
-        ψ =  0.985677
-        λ =  1.0
-    end
-
-    return ζ*Δη^ψ + ξ*Δη^λ + χ*Δη + θ
-end
-
-"""
     getDEM(fname::String)
         Initialise DEM structure reading .h5 from fname
 """
-function getDEM(fname::String)
+function getDEM(fname, Δη, ϕ)
     tensor,axis,volume = DEMloader(fname)
     # fixtensor!(tensor)
 
-    # tmp = deepcopy(tensor)
-    # tensor[:,1] = tmp[:,1] - tmp[:,7] - tmp[:,8]
-    # tensor[:,3] = tmp[:,3] - tmp[:,9] - tmp[:,8]
-    # tensor[:,7] .= 0.0
-    # tensor[:,8] .= 0.0
-    # tensor[:,9] .= 0.0
-
-    w = weakening(1e-3, 0.20)
+    η_cutoff = weakening(Δη, ϕ)
 
     # -- Get and process axes from the DEM
     ax1   = view(axis,:,1)
@@ -121,12 +74,13 @@ function getDEM(fname::String)
         tensor,
         axis, 
         dropdims(volume,dims=2),
-        w,
+        η_cutoff,
         Array(a1a2_blk),
         Array(a2a3_blk), 
         permutation_blk, 
         sblk, 
-        nblk
+        nblk,
+        parameterization(Δη, ϕ)
     )
 
 end
@@ -134,7 +88,6 @@ end
 function get_stride(v::Vector)
     i=1
     @inbounds while v[i]==v[i+1]
-    # @inbounds while v[i]<=v[i+1]
         i+=1
     end
     return i
@@ -180,50 +133,9 @@ function fixtensor!(C)
     end
 end
 
-"""
-    -------------------------------------------------------------------------
-    Parametrisation of average inclusion shape for WEAK inclusions
-    -------------------------------------------------------------------------    
-    rᵢ = ζᵢ + ξᵢ * A + χᵢ * B
-    Where :
-        (*) r₁ = log10(a₁ / a₂) (INCLUSION FSE)
-        (*) r₂ = log10(a₂ / a₃) (INCLUSION FSE)
-        (*) A  = log10(a₁ / a₂) (BULK FSE)
-        (*) B  = log10(a₂ / a₃) (BULK FSE)
-        (*) Greek characters -> fitting coefficients 
-    Input :
-        (*) a1, a2, a3 -> principal semi-axes of the BULK FSE   
-""" 
-function fabric_parametrisation(a1::Float64, a2::Float64, a3::Float64, R1::Parameterisation, R2::Parameterisation)
-    # -- Bulk semi axes ratios
-    A = log10(a1/a2)
-    B = log10(a2/a3)
-    # -- Calculate: r₁ = log10(a₁ / a₂)
-    r₁ = R1.ζ + R1.ξ*A + R1.χ*B
-    # -- Calculate: r₂ = log10(a₂ / a₃)
-    r₂ = R2.ζ + R2.ξ*A + R2.χ*B
-    return r₁, r₂ 
-end
-
-function fittingcoefficients()
-    # ==== Weak Inclusions (values from paper)
-    # -- Calculate: r₁ = log10(a₁ / a₂)
-    ζ =  0.015159;
-    ξ =  1.1013;
-    χ = -0.093104;
-    R1 = Parameterisation(ζ,ξ,χ)
-        
-    # -- Calculate: r₂ = log10(a₂ / a₃)
-    ζ =  0.0028906;
-    ξ =  1.0533;
-    χ =  0.23141;
-    R2 = Parameterisation(ζ,ξ,χ)
-    return R1,R2
-end
-
 function anisotropic_tensor(FSE::Array{FiniteStrainEllipsoid{Float64},2}, D::DEM, ::Val{T}) where {T}
     # Allocate arrays
-    nu_11 = Array{Float64,2}(undef, size(FSE, 1), 7)
+    nu_11 = Matrix{Float64}(undef, size(FSE, 1), 7)
     nu_33 = similar(nu_11)
     nu_55 = similar(nu_11)
     nu_13 = similar(nu_11)
@@ -231,18 +143,15 @@ function anisotropic_tensor(FSE::Array{FiniteStrainEllipsoid{Float64},2}, D::DEM
     nu_35 = similar(nu_11)
     v₁ = [similar(D.a1a2_blk) for _ in 1:Threads.nthreads()]
     v₂ = [similar(D.a2a3_blk) for _ in 1:Threads.nthreads()]
-    max_a1a2, max_a2a3 = maximum(D.a1a2_blk), maximum(D.a2a3_blk)
-    
-    # Fitting coefficients of the axes parameterisation
-    R1, R2 = fittingcoefficients()
+    # max_a1a2, max_a2a3 = maximum(D.a1a2_blk), maximum(D.a2a3_blk)
     
     # Get η from data base and rotate it
     @batch for i in eachindex(FSE)
         get_tensor_and_rotate!( nu_11, nu_33, nu_55, nu_13, nu_15, nu_35,
-                                FSE[i],R1,R2,D,i,v₁,v₂, max_a1a2, max_a2a3)
+                                FSE[i], D, i, v₁, v₂)
     end
 
-    # -- 7th ip
+    # 7th ip
     one_sixth = 1/6
     @tturbo for i in 1:size(nu_11,1)
         nu_11[i,7] = (nu_11[i,1] + nu_11[i,2] + nu_11[i,3] + nu_11[i,4] + nu_11[i,5] + nu_11[i,6]) * one_sixth
@@ -252,9 +161,10 @@ function anisotropic_tensor(FSE::Array{FiniteStrainEllipsoid{Float64},2}, D::DEM
         nu_15[i,7] = (nu_15[i,1] + nu_15[i,2] + nu_15[i,3] + nu_15[i,4] + nu_15[i,5] + nu_15[i,6]) * one_sixth
         nu_35[i,7] = (nu_35[i,1] + nu_35[i,2] + nu_35[i,3] + nu_35[i,4] + nu_35[i,5] + nu_35[i,6]) * one_sixth
     end
-    return StiffnessTensor(nu_11, nu_33, nu_55, nu_13, nu_15, nu_35)
+    
+    StiffnessTensor(nu_11, nu_33, nu_55, nu_13, nu_15, nu_35)
 
-end ### END rotate_tensor FUNCTION #############################################
+end 
 
 function argminsortedsecond(v)
     imin = 0
@@ -283,18 +193,10 @@ end
 
 
 function get_tensor_and_rotate!(nu_11, nu_33, nu_55, nu_13, nu_15, nu_35,
-                                FSEᵢ,R1,R2,D,i,v₁,v₂,max_a1a2,max_a2a3)
-    # Average fabric -> r₁ = log10(a1/a2) and r₂ = log10(a2/a3)
-    a1 = applybounds(FSEᵢ.a1, 25.0, 1.0)
-    a2 = applybounds(FSEᵢ.a2, 1.0, 0.01)
-
-    r₁, r₂ = fabric_parametrisation(a1,
-                                    1.0,
-                                    a2, 
-                                    R1,
-                                    R2)
+                                FSEᵢ, D, i, v₁, v₂)
+    
+    r₁, r₂ = fabric_shape(FSEᵢ.a1, 1.0, D.parameterization)
     nt = Threads.threadid()
-
    
     @inbounds for j in eachindex(D.a1a2_blk)
         v₁[nt][j] = abs(r₁-D.a1a2_blk[j])
@@ -321,12 +223,12 @@ function get_tensor_and_rotate!(nu_11, nu_33, nu_55, nu_13, nu_15, nu_35,
     R = @SMatrix [cosd(a)  0   sind(a)
                    0       1   0
                  -sind(a)  0   cosd(a)]
-    # Rotate tensor (fast version derived from symbolic calculus)
+    # Rotate tensor
     η11,η33,η55,η13,η15,η35 = directRotation2D(R,C)
     # Fill array
     nu_11[i] = η11
     nu_33[i] = η33
-    nu_55[i] = max(η55, 0.27)
+    nu_55[i] = max(η55, D.w)
     nu_13[i] = η13
     nu_15[i] = η15
     nu_35[i] = η35
@@ -375,7 +277,7 @@ function anisotropic_tensor_blks(FSE::Array{FiniteStrainEllipsoid{Float64},2}, D
     n = size(FSE, 1)
     nu0 = Vector{Float64}(undef, 9)
     nu_interp = fill(0.0,6,6)
-    nu_11 = Array{Float64,2}(undef, n, 6)
+    nu_11 = Matrix{Float64}(undef, n, 6)
     nu_33 = similar(nu_11)
     nu_55 = similar(nu_11)
     nu_13 = similar(nu_11)

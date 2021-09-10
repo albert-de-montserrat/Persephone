@@ -28,9 +28,7 @@ function solveStokes(U, P, gr, Ucartesian,Upolar, g, ρ, η, 𝓒,
 end
 # ==================================================================================================================
 
-@inline function initvelocity(nn)
-    return [Point2D{Cartesian}(0.0,0.0) for _ = 1:nn], [Point2D{Polar}(0.0,0.0) for _ = 1:nn] 
-end
+@inline initvelocity(nn) = [Point2D{Cartesian}(0.0,0.0) for _ = 1:nn], [Point2D{Polar}(0.0,0.0) for _ = 1:nn] 
 
 function remove_wind(r, Uθ::Vector{Point2D{Polar}}) 
     rmax = maximum(r)
