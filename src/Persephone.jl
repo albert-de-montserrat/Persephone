@@ -6,9 +6,6 @@ using SuiteSparse
 using SparseArrays
 using LoopVectorization
 using IterativeSolvers
-using Krylov
-using CUDA
-using CUDA.CUSPARSE
 using Preconditioners
 using HDF5
 using TimerOutputs
