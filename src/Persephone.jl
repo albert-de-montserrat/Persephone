@@ -45,16 +45,20 @@ export getviscosity
 export getviscosity!
 export state_equation
 export state_equation!
+
 include("Stokes/StokesSolver.jl")
 export solveStokes
 export initvelocity
 export rotation_matrix
 export assembly_stokes_cylindric
 
-# include("Stokes/AssemblerStokes.jl")
-# export stokes_immutables
-
 include("ThermalDiffusion/ThermalSolver.jl")
+
+include("Algebra/Quadrature.jl")
+export ScratchThermalGlobal
+export ShapeFunctionsThermal
+export ShapeFunctionsStokes
+export _get_SF
 
 include("Stress/FSE.jl")
 export FiniteStrainEllipsoid
@@ -62,12 +66,6 @@ export volume_integral
 export getFSE
 export rebuild_FSE
 export isotropic_lithosphere!
-
-include("Stress/StressCalculation.jl")
-export SymmetricTensor
-export Gradient
-export initstress
-export stress
 
 include("IterativeSolvers.jl")
 
@@ -80,12 +78,6 @@ export fixangles6!
 export getspeed
 export calculate_Δt
 export getips
-
-include("Algebra/Quadrature.jl")
-export ScratchThermalGlobal
-export ShapeFunctionsThermal
-export ShapeFunctionsStokes
-export _get_SF
 
 include("Algebra/Sparsity.jl")
 export Stokes
@@ -164,6 +156,7 @@ export diffusion_immutables
 
 include("Stokes/AssemblerStokes.jl")
 export solve_stokes_threaded
+export stokes_immutables
 
 include("Setup/boundary_conditions.jl")
 export BC
@@ -172,5 +165,11 @@ export temperature_bcs
 
 include("PiC/CubicInterpolations.jl")
 export quasicubic_interpolation
+
+include("Stress/StressCalculation.jl")
+export SymmetricTensor
+export Gradient
+export initstress
+export stress!
 
 end # module
