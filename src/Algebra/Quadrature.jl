@@ -75,8 +75,8 @@ end
 function ip_triangle6()
 
      # -- Integration point coordinates
-    g1  = (8.0-sqrt(10.0) + sqrt(38.0-44.0*sqrt(2.0/5.0)))/18.0;
-    g2  = (8.0-sqrt(10.0) - sqrt(38.0-44.0*sqrt(2.0/5.0)))/18.0;
+    g1  = (8.0-sqrt(10.0) + sqrt(38.0-44.0*sqrt(2.0/5.0)))/18.0
+    g2  = (8.0-sqrt(10.0) - sqrt(38.0-44.0*sqrt(2.0/5.0)))/18.0
     ipx = @SMatrix [
         1.0-2.0*g1  g1
         g1          1.0-2.0*g1

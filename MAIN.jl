@@ -14,7 +14,7 @@ function main()
     else
         path = "/home/albert/Desktop/output"
     end
-    folder = "AnisoRandom"
+    folder = "AnisoRandom4_noInjection4"
     OUT, iplot = setup_output(path, folder)
 
     #=========================================================================
@@ -29,8 +29,8 @@ function main()
     else
         nr = Int(1+2^N)
         nθ = Int(12*2^N)
-        nr = Int(1 + 32)
-        nθ = Int(256)
+        # nr = Int(1 + 32)
+        # nθ = Int(256)
         gr = Grid(nθ, nr)
     end
     IDs = point_ids(gr)
@@ -81,9 +81,9 @@ function main()
     fixangles6!(θ6)
     fixangles!(θ3)
     ipx, ipz = getips(gr.e2n, θ6, r6 )
-    ix, iz = polar2cartesian(ipx, ipz)
-    transition = 2.12-0.2276
-    isotropic_idx = findall(ipz.> transition)
+    # ix, iz = polar2cartesian(ipx, ipz)
+    transition = 2.22-0.2276
+    # isotropic_idx = findall(ipz .> transition)
     IntC = [@inbounds(Point2D{Polar}(ipx[i], ipz[i])) for i in CartesianIndices(ipx)] # → ip coordinates
 
     #=========================================================================
@@ -104,10 +104,11 @@ function main()
     # Allocate nodal velocities
     Ucartesian, Upolar = initvelocity(gr.nnod)
     # Initialise temperature @ nodes
-    T = init_temperature(gr, IDs, type = :random)
+    perturbation = :harmonic
+    T = init_temperature(gr, IDs, type = perturbation)
     ΔT = similar(T)
     # Initialise temperature @ particles
-    init_particle_temperature!(particle_fields, particle_info, type = :random)
+    init_particle_temperature!(particle_fields, particle_info, type = perturbation)
 
     viscosity_type = :IsoviscousAnisotropic
     #= Options:
@@ -136,7 +137,7 @@ function main()
             TODO pre-compute the Jacobians
     =========================================================================#
     # Allocate rotation tensor 
-    TT = rotation_matrix(gr.θ)
+    RotationMatrices = rotation_matrix(gr.θ)
     # Allocate sparsity patterns of Stokes block matrices 
     KKidx, GGidx, MMidx, = sparsitystokes(gr)
     # Allocate spasity pattern of thermal diffusion stiffness matrix
@@ -172,9 +173,8 @@ function main()
     Time = 0.0
     T0 = deepcopy(T)
 
-    for iplot in 1:100
-
-        for _ in 1:1
+    for iplot in 1:50
+        for _ in 1:50
             reset_timer!(to)
 
             #= Update material properties =#
@@ -186,7 +186,6 @@ function main()
             #=
                 Stokes solver using preconditioned-CG 
             =#       
-            reset_timer!(to)
             Ucartesian, Upolar, U, Ucart, P, to = solveStokes(
                 U,
                 P,
@@ -198,7 +197,7 @@ function main()
                 η,
                 𝓒,
                 coordinates,
-                TT,
+                RotationMatrices,
                 PhaseID,
                 UBC,
                 KKidx,
@@ -206,7 +205,7 @@ function main()
                 MMidx,
                 to,
             );
-            to
+            
             println("min:max Uθ", extrema(@views U[1:2:end]))
             println("mean speed  ", mean(@views @. (√(U[1:2:end]^2 + U[2:2:end]^2))))
 
@@ -223,7 +222,7 @@ function main()
             end
 
             @timeit to "Finite Strain Ellipsoid" begin
-                isotropic_lithosphere!(F, isotropic_idx)
+                # isotropic_lithosphere!(F, isotropic_idx)
                 FSE = getFSE(F, FSE)
             end
 
@@ -252,7 +251,6 @@ function main()
                 T,
                 T0,
                 TBC,
-                :on,
                 to,
             )
 
@@ -274,6 +272,7 @@ function main()
                 @timeit to "F → particle" particle_fields = F2particle(
                     particle_fields, particle_info, ipx, ipz, F
                 )
+
                 @timeit to "T → particle" begin
                     interpolate_temperature!(
                         T0,
@@ -307,9 +306,9 @@ function main()
                 println("Min-max particle temperature = ", extrema(particle_fields.T))
             end
 
-            @timeit to "Particles" begin
+            @timeit to "Locate articles" begin
                 #= Particle locations =#
-                @timeit to "Locate" particle_info, particle_weights, found = tsearch_parallel(
+                particle_info, particle_weights, found = tsearch_parallel(
                     particle_info, particle_weights, θThermal, rThermal, gr.neighbours, IntC
                 )
 
@@ -331,11 +330,11 @@ function main()
                         Fij : particle -> ip
                         T   : particle -> node
                 =#
-                @timeit to "Fij -> ip" F = F2ip(
+                F = F2ip(
                     F, particle_fields, particle_info, particle_weights, gr.nel
                 )
 
-                @timeit to "T -> node" T = T2node(
+                T = T2node(
                     T,
                     particle_fields,
                     particle_info,
@@ -363,7 +362,7 @@ function main()
 
             println("mean T after advection  ", mean(T))
 
-            @timeit to "Run stats" write_stats(U, T, length(particle_info), gr, Time, ScratchNu, stats_file)
+            write_stats(U, T, length(particle_info), gr, Time, ScratchNu, stats_file)
 
             Time += Δt
             show(to; compact=true)
