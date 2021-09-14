@@ -167,7 +167,7 @@ function kernel_Fij_particle!(particle_fields, particle_info, ipx, ipz, F, i)
 end
 
 function F2particle(particle_fields, particle_info, ipx, ipz, F)
-    for ipart in 1:length(particle_info)
+    @batch for ipart in 1:length(particle_info)
         kernel_Fij_particle!(particle_fields, particle_info, ipx, ipz, F, ipart)
     end
     particle_fields
@@ -495,7 +495,7 @@ function F2ip(F, particle_fields, particle_info, particle_weights, nel)
     weight = Array{Float64,2}(undef, np, 6)
     Threads.@threads for i in axes(particle_info,1)
         ## THIS IS TYPE UNSTABLE -> FIX ASAP
-        @inbounds @views weight[i,:] .= 1.0./particle_weights[i].ip_weights # inverse of the distance
+        @inbounds @views weight[i,:] .= 1.0./(particle_weights[i].ip_weights.^2) # inverse of the distance
     end
 
     F2ip_inner_tkernel(F, particle_info, particle_fields, weight, nel)
@@ -763,7 +763,7 @@ end
 """
 applybounds(A::T, upper::T, lower::T) where {T<:Real} = max(min(A, upper), lower)
 
-ip2particle(ip_field,iw) = mydot(ip_field,iw) / sum(iw)
+ip2particle(ip_field,iw) = mydot(ip_field, iw) / sum(iw)
 
 function kernel1(a, b, collapse=false)
     m,n = maximum(a),size(a,2) 

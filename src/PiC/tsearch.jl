@@ -442,10 +442,10 @@ function addreject(T, F, gr, θThermal, rThermal, IC, particle_info, particle_we
 
                 # Deformation gradient
                 idx = view(e2n,1:6,iparent)
-                Fxxp = ip2particle([F[i][1,1] for i in idx], iw)
-                Fzzp = ip2particle([F[i][2,2] for i in idx], iw)
-                Fzxp = ip2particle([F[i][2,1] for i in idx], iw)
-                Fxzp = ip2particle([F[i][1,2] for i in idx], iw)
+                Fxxp = ip2particle([F[i][1,1] for i in idx], (@. 1/iw^2))
+                Fzzp = ip2particle([F[i][2,2] for i in idx], (@. 1/iw^2))
+                Fzxp = ip2particle([F[i][2,1] for i in idx], (@. 1/iw^2))
+                Fxzp = ip2particle([F[i][1,2] for i in idx], (@. 1/iw^2))
 
                 # Temperature
                 idx = view(e2n_p1,:,iel)
