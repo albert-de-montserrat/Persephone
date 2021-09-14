@@ -6,14 +6,12 @@ Base.:*(A::Point2D{Polar},b::Number) = Point2D{Polar}(A.x * b , A.z * b)
 
 Base.:*(A::Point2D{Cartesian},b::Number) = Point2D{Cartesian}(A.x * b , A.z * b) 
 
-# PARTICLES ADVECTION ===============================================================
 function particlesadvection!(Particles, Δt; multiplier=1)
     Threads.@threads for i in axes(Particles,1)
         @inbounds Particles[i].CCart.x += Particles[i].UCart.x * Δt * multiplier
         @inbounds Particles[i].CCart.z += Particles[i].UCart.z * Δt * multiplier
     end
 end
-
 
 function particle_coordinates(P::Vector{PINFO}; coordinates_system = "cartesian")
     np = length(P)
