@@ -275,7 +275,7 @@ function stokes_immutables(gr, nnod, ndim, nvert, nnodel, nel, nip)
     DoF_U = DoFs_Velocity(gr.e2n)
     DoF_P = DoFs_Pressure(gr.e2nP)
     # Diffusion sparse matrices and force vector
-    _, _, _, _, KS, GS, MS, _ = sparsitystokes(gr.e2n, gr.e2nP)
+    _, _, _, _, KS, GS, MS, _ = sparsitystokes(gr)
     FS = Vector{Float64}(undef, 2*nnod)
 
     return  KS, GS, MS, FS, DoF_U, DoF_P, nn, SF_Stokes, ScratchStokes

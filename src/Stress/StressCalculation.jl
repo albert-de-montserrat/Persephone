@@ -111,7 +111,7 @@ function stress(U, T, F, 𝓒, τ, ε, EL2NOD, theta, r, η, PhaseID, Δt)
             # =======================================================================#
             # η_blk = _element_viscosity(η,EL2NOD,PhaseID,il:iu,N_ip)
 
-            #===========================================================================================================
+            #============================================================================================================
             # CALCULATE 2nd JACOBIAN (FROM CARTESIAN TO POLAR COORDINATES --> curved edges), ITS DETERMINANT AND INVERSE
             # ===========================================================================================================
             # NOTE: For triangular elements with curved edges the Jacobian needs to be computed at each integration
@@ -292,16 +292,18 @@ end
 end
 
 @inline function _Fij_Rk4(Δt, ∂Ux∂xᵢ, ∂Ux∂zᵢ, ∂Uz∂xᵢ, ∂Uz∂zᵢ, Fxx, Fxz, Fzx, Fzz)
-    kxx = Δt*(∂Ux∂xᵢ*Fxx + ∂Ux∂zᵢ*Fzx)
-    kxz = Δt*(∂Ux∂xᵢ*Fxz + ∂Ux∂zᵢ*Fzz)
-    kzx = Δt*(∂Uz∂xᵢ*Fxx + ∂Uz∂zᵢ*Fzx)
-    kzz = Δt*(∂Uz∂xᵢ*Fxz + ∂Uz∂zᵢ*Fzz)
+    kxx = @muladd Δt*(∂Ux∂xᵢ*Fxx + ∂Ux∂zᵢ*Fzx)
+    kxz = @muladd Δt*(∂Ux∂xᵢ*Fxz + ∂Ux∂zᵢ*Fzz)
+    kzx = @muladd Δt*(∂Uz∂xᵢ*Fxx + ∂Uz∂zᵢ*Fzx)
+    kzz = @muladd Δt*(∂Uz∂xᵢ*Fxz + ∂Uz∂zᵢ*Fzz)
     return kxx, kxz, kzx, kzz
 end
 
-@inline function _Fij_Rk4!( Fxx_blk, Fzz_blk, Fxz_blk, Fzx_blk,
+@inline function _Fij_Rk4!( 
+    Fxx_blk, Fzz_blk, Fxz_blk, Fzx_blk,
     ∂Ux∂x, ∂Uz∂z, ∂Ux∂z, ∂Uz∂x,
-    Δt)
+    Δt
+)
     
     one_sixth = 1/6
     @turbo for i in axes(Fxx_blk,1)
@@ -311,16 +313,16 @@ end
         # 1st step
         k1xx, k1xz, k1zx, k1zz = _Fij_Rk4(Δt, ∂Ux∂xᵢ, ∂Ux∂zᵢ, ∂Uz∂xᵢ, ∂Uz∂zᵢ, Fxx, Fxz, Fzx, Fzz)
         # 2nd step
-        Fxxi = Fxx + k1xx*0.5
-        Fxzi = Fxz + k1xz*0.5
-        Fzxi = Fzx + k1zx*0.5
-        Fzzi = Fzz + k1zz*0.5
+        Fxxi = fma(k1xx, 0.5, Fxx)
+        Fxzi = fma(k1xz, 0.5, Fxz)
+        Fzxi = fma(k1zx, 0.5, Fzx)
+        Fzzi = fma(k1zz, 0.5, Fzz)
         k2xx, k2xz, k2zx, k2zz = _Fij_Rk4(Δt, ∂Ux∂xᵢ, ∂Ux∂zᵢ, ∂Uz∂xᵢ, ∂Uz∂zᵢ, Fxx, Fxz, Fzx, Fzz)
         # 3rd step
-        Fxxi = Fxx + k2xx*0.5
-        Fxzi = Fxz + k2xz*0.5
-        Fzxi = Fzx + k2zx*0.5
-        Fzzi = Fzz + k2zz*0.5
+        Fxxi = fma(k2xx, 0.5, Fxx)
+        Fxzi = fma(k2xz, 0.5, Fxz)
+        Fzxi = fma(k2zx, 0.5, Fzx)
+        Fzzi = fma(k2zz, 0.5, Fzz)
         k3xx, k3xz, k3zx, k3zz = _Fij_Rk4(Δt, ∂Ux∂xᵢ, ∂Ux∂zᵢ, ∂Uz∂xᵢ, ∂Uz∂zᵢ, Fxx, Fxz, Fzx, Fzz)
         # 4th step
         Fxxi = Fxx + k3xx
@@ -329,10 +331,10 @@ end
         Fzzi = Fzz + k3zz
         k4xx, k4xz, k4zx, k4zz = _Fij_Rk4(Δt, ∂Ux∂xᵢ, ∂Ux∂zᵢ, ∂Uz∂xᵢ, ∂Uz∂zᵢ, Fxx, Fxz, Fzx, Fzz)
         # last step
-        Fxz_blk[i] += (k1xz + 2*(k2xz + k3xz) + k4xz)*one_sixth
-        Fxx_blk[i] += (k1xx + 2*(k2xx + k3xx) + k4xx)*one_sixth
-        Fzx_blk[i] += (k1zx + 2*(k2zx + k3zx) + k4zx)*one_sixth
-        Fzz_blk[i] += (k1zz + 2*(k2zz + k3zz) + k4zz)*one_sixth
+        Fxz_blk[i] += @muladd (k1xz + 2*(k2xz + k3xz) + k4xz)*one_sixth
+        Fxx_blk[i] += @muladd (k1xx + 2*(k2xx + k3xx) + k4xx)*one_sixth
+        Fzx_blk[i] += @muladd (k1zx + 2*(k2zx + k3zx) + k4zx)*one_sixth
+        Fzz_blk[i] += @muladd (k1zz + 2*(k2zz + k3zz) + k4zz)*one_sixth
     end
 
 end

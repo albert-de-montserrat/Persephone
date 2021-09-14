@@ -79,17 +79,23 @@ function Fij2particle(particle_fields, particle_info, particle_weights, gr, F)
     EL2NOD_P1, EL2NOD = gr.e2n_p1, gr.e2n
 
     # (1) IP to NODE ----------------------------------------------------------
-    # -- Nodal element coordinates
-    ξ = @SVector [0.0, 1.0, 0.0]
-    η = @SVector [0.0, 0.0, 1.0]
-
+    # # -- Nodal element coordinates
+    # ξ = @SVector [0.0, 1.0, 0.0]
+    # η = @SVector [0.0, 0.0, 1.0]
+    # # -- Transformation to ip triangular element coordinates
+    # ξv = @. 2*ξ - 1/3
+    # ηv = @. 2*η - 1/3
+    
     # -- Transformation to ip triangular element coordinates
-    ξv = @. 2*ξ - 1/3
-    ηv = @. 2*η - 1/3
+    X = @SMatrix [
+        -1/3    -1/3
+        2-1/3   -1/3
+        -1/3    2-1/3
+    ]
 
     # -- Shape functions
     nn3 = Val(3)
-    NN, _ = shape_functions_triangles(hcat(ξv, ηv),nn3)
+    NN, _ = shape_functions_triangles(X,nn3)
     
     # -- Map from integration points to the 6 element nodes 
     m, n = size(F)
@@ -134,26 +140,25 @@ end
     x1,x2,x3 = v.x[1], v.x[2], v.x[3]
     z1,z2,z3 = v.z[1], v.z[2], v.z[3]
     x,z = pc.x, pc.z
-    b1 = ((z2 - z3) * (x - x3) + (x3 - x2) * (z - z3)) /
+    b1 = @muladd ((z2 - z3) * (x - x3) + (x3 - x2) * (z - z3)) /
          ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
-    b2 = ((z3 - z1) * (x - x3) + (x1 - x3) * (z - z3)) /
+    b2 = @muladd ((z3 - z1) * (x - x3) + (x1 - x3) * (z - z3)) /
          ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
     b3 = 1 - b1 - b2
     @SVector [b1, b2, b3]
 end 
 
-@inline function dot_F2part(F, t, N, i1, i2, idx)
-    a = 0.0
-    for (i, _i) in enumerate(idx)
-       @inbounds a += F[t, _i][i1, i2]*N[i] 
-    end
-    a
-end
+@inline dot_F2part(F, t, N, i1, i2, idx) = 
+    @muladd F[t, idx[1]][i1, i2]*N[1] + F[t, idx[2]][i1, i2]*N[2] + F[t, idx[3]][i1, i2]*N[3] 
 
 function kernel_Fij_particle!(particle_fields, particle_info, ipx, ipz, F, i)
     t = particle_info[i].t_parent
-    idx = @SVector [4,6,5]
-    v = (x=(view(ipx, t, idx)), z=(view(ipz, t, idx))) # Corner ips := [4 6 5]
+    idx = @SVector [4, 6, 5]
+    v = (
+        x=(view(ipx, t, idx)), 
+        z=(view(ipz, t, idx))
+    ) # Corner ips := [4 6 5]
+    
     N = barycentric_particle(v, particle_info[i].CPolar)
 
     particle_fields.Fxx[i] = dot_F2part(F, t, N, 1, 1, idx)
@@ -164,7 +169,7 @@ function kernel_Fij_particle!(particle_fields, particle_info, ipx, ipz, F, i)
 end
 
 function F2particle(particle_fields, particle_info, ipx, ipz, F)
-    @batch for ipart in 1:length(particle_info)
+    for ipart in 1:length(particle_info)
         kernel_Fij_particle!(particle_fields, particle_info, ipx, ipz, F, ipart)
     end
     particle_fields
@@ -196,13 +201,13 @@ function ip2node(EL2NOD, F)
 end
 
 
-function Fijkernel!(FF, idx1, idx2, NN, EL2NOD, EL2NOD_P1, area_el, w, dummy, 
+function Fijkernel!(FF, idx1, idx2, NN, EL2NOD, EL2NOD_P1, w, dummy, 
                    particle_info, particle_weights, particle_fields)
                    
     m, n = size(FF)
     F = Array{Float64,2}(undef, m, n)
-    @inbounds for i in CartesianIndices(FF)
-         F[i] = FF[i][idx1, idx2]
+    Threads.@threads for i in CartesianIndices(FF)
+        @inbounds F[i] = FF[i][idx1, idx2]
     end
 
     # F = [FF[i][idx1,idx2] for i in CartesianIndices(FF)]
@@ -210,9 +215,11 @@ function Fijkernel!(FF, idx1, idx2, NN, EL2NOD, EL2NOD_P1, area_el, w, dummy,
     F_smooth = smoothfield(F_nodal, view(EL2NOD,1:6,:), w, dummy)
     # smoothfield(F_nodal, EL2NOD, area_el, w, dummy)
 
-    @inbounds for i in axes(particle_info,1)
-        idx = view(EL2NOD_P1,:,particle_info[i].t)
-        particle_fields.Fxx[i] = node2particle(view(F_smooth,idx), particle_weights[i].barycentric)
+    Threads.@threads for i in axes(particle_info,1)
+        @inbounds particle_fields.Fxx[i] = node2particle(
+            view(F_smooth, view(EL2NOD_P1,:,particle_info[i].t)), 
+            particle_weights[i].barycentric
+        )
     end
 end
 
@@ -236,10 +243,10 @@ function Fij2particle_thread!(particle_fields,particle_info,particle_weights,EL2
     w  = Vector{Float64}(undef,nnod) # weight buffer
     dummy = similar(w) # output buffer
     
-    Fijkernel!(F, 1, 1, NN, EL2NOD, EL2NOD_P1, area_el, w, dummy, particle_info, particle_weights, particle_fields)  
-    Fijkernel!(F, 1, 2, NN, EL2NOD, EL2NOD_P1, area_el, w, dummy, particle_info, particle_weights, particle_fields)  
-    Fijkernel!(F, 2, 1, NN, EL2NOD, EL2NOD_P1, area_el, w, dummy, particle_info, particle_weights, particle_fields)  
-    Fijkernel!(F, 2, 2, NN, EL2NOD, EL2NOD_P1, area_el, w, dummy, particle_info, particle_weights, particle_fields)  
+    Fijkernel!(F, 1, 1, NN, EL2NOD, EL2NOD_P1, w, dummy, particle_info, particle_weights, particle_fields)  
+    Fijkernel!(F, 1, 2, NN, EL2NOD, EL2NOD_P1, w, dummy, particle_info, particle_weights, particle_fields)  
+    Fijkernel!(F, 2, 1, NN, EL2NOD, EL2NOD_P1, w, dummy, particle_info, particle_weights, particle_fields)  
+    Fijkernel!(F, 2, 2, NN, EL2NOD, EL2NOD_P1, w, dummy, particle_info, particle_weights, particle_fields)  
 
 end
 
@@ -247,20 +254,24 @@ end
 Interpolate smoothed nodal Fij to particles
 """
 function kernelF2particle!(particle_fields,Fxx_smooth,Fzz_smooth,Fxz_smooth,Fzx_smooth, EL2NOD_P1,particle_info,particle_weights)
-    @inbounds Threads.@threads for i in axes(particle_info,1)
-        idx = view(EL2NOD_P1,:,particle_info[i].t)
-        particle_fields.Fxx[i] = node2particle(view(Fxx_smooth, idx), particle_weights[i].barycentric)
-        particle_fields.Fzz[i] = node2particle(view(Fzz_smooth, idx), particle_weights[i].barycentric)
-        particle_fields.Fxz[i] = node2particle(view(Fxz_smooth, idx), particle_weights[i].barycentric)
-        particle_fields.Fzx[i] = node2particle(view(Fzx_smooth, idx), particle_weights[i].barycentric)
+    Threads.@threads for i in axes(particle_info,1)
+        # idx = view(EL2NOD_P1,:,particle_info[i].t)
+        @inbounds particle_fields.Fxx[i] = 
+            node2particle(view(Fxx_smooth, view(EL2NOD_P1,:,particle_info[i].t)), particle_weights[i].barycentric)
+        @inbounds particle_fields.Fzz[i] = 
+            node2particle(view(Fzz_smooth, view(EL2NOD_P1,:,particle_info[i].t)), particle_weights[i].barycentric)
+        @inbounds particle_fields.Fxz[i] = 
+            node2particle(view(Fxz_smooth, view(EL2NOD_P1,:,particle_info[i].t)), particle_weights[i].barycentric)
+        @inbounds particle_fields.Fzx[i] = 
+            node2particle(view(Fzx_smooth, view(EL2NOD_P1,:,particle_info[i].t)), particle_weights[i].barycentric)
     end
 end
 
-function smoothfield(F, EL2NOD, w, dummy) 
+function smoothfield(F, e2n, w, dummy) 
     fill!(dummy, 0.0)
     fill!(w, 0)
     for i in 1:6
-        idx = view(EL2NOD,i,:)
+        idx = view(e2n,i,:)
         @views w[idx] .+= 1
         @views dummy[idx] .+= view(F, :, i)
     end
@@ -387,8 +398,7 @@ function interpolate_temperature!(
                         to
                     )
                     
-    @timeit to "T → particle" begin
-        @timeit to "step 1" particle_fields = temperature2particle(
+    particle_fields = temperature2particle(
             T0,
             particle_fields,
             gr.e2n_p1,
@@ -401,17 +411,17 @@ function interpolate_temperature!(
             nr,
             Δt,
         )
-        @timeit to "step 2" ΔT_remaining = ΔTsubgrid2node(
+    ΔT_remaining = ΔTsubgrid2node(
             ΔT,
             particle_fields,
             particle_info,
             particle_weights,
             gr
         )
-        @timeit to "step 3" corrected_particle_temperature!(
+        
+    corrected_particle_temperature!(
             particle_fields, ΔT_remaining
         )
-    end
 end
 
 # INTERPOLATE TEMPERATURE FROM NODES TO PARTICLES =======================================

@@ -1,6 +1,11 @@
+struct RotationMatrix{T}
+    TT::T
+    TTᵀ::T
+end
+
 # ==================================================================================================================
 function solveStokes(U, P, gr, Ucartesian,Upolar, g, ρ, η, 𝓒,
-    coordinates, TT,
+    coordinates, RotationMatrices,
     PhaseID, UBC,
     KKidx,GGidx,MMidx,
     to)
@@ -14,14 +19,14 @@ function solveStokes(U, P, gr, Ucartesian,Upolar, g, ρ, η, 𝓒,
            assembly_stokes_cylindric(gr, coordinates, g, ρ, η, 𝓒, PhaseID, KKidx, GGidx, MMidx)
 
         @timeit to "BCs" begin
-            KK,GG,Rhs = _prepare_matrices(KK, GG, Rhs, TT)
+            KK,GG,Rhs = _prepare_matrices(KK, GG, Rhs, RotationMatrices)
             U,Rhs = _apply_bcs(U,KK,Rhs,∂Ωu,ufix)
         end
 
         @timeit to "PCG solver" U, P = StokesPcCG(U, P, KK, MM, GG, Rhs, ifree)
-        # U, Ucart, Upolar, Ucartesian = updatevelocity(U,Ucartesian, Upolar,  gr.θ, gr.r, TT)
 
-        @timeit to "Remove net rotation" U, Ucart, Upolar, Ucartesian = updatevelocity2(U, Ucartesian, Upolar, ρ, TT, coordinates, gr)
+        @timeit to "Remove net rotation" U, Ucart, Upolar, Ucartesian = 
+            updatevelocity2(U, Ucartesian, Upolar, ρ, RotationMatrices.TT, coordinates, gr)
     end
 
     return Ucartesian, Upolar, U, Ucart, P, to
@@ -150,15 +155,13 @@ end
 ## Nullspace removal
 @inline function updatevelocity2(U, Ucartesian, Upolar, ρ, TT, coordinates, gr)
 
-    theta, rr = coordinates.θ, coordinates.r
+    θ, r = coordinates.θ, coordinates.r
 
     # Net rotation
     Uθ = @views U[1:2:end]
-    angular_momentum = volume_integral(Uθ.*ρ, gr.e2n, theta, rr)
-    moment = volume_integral(gr.r.*ρ,  gr.e2n, theta, rr)
+    angular_momentum = volume_integral(Uθ.*ρ, gr.e2n, θ, r)
+    moment = volume_integral(gr.r.*ρ,  gr.e2n, θ, r)
     ω = angular_momentum/moment
-
-    # ω = volume_integral(Uθ./gr.r, EL2NOD, theta, rr)
     @views @. U[1:2:end] -= ω*gr.r
 
     # Update velocity
@@ -173,15 +176,13 @@ end
     return U,Rhs
 end
 
-@inline function _prepare_matrices(KK,GG,Fb,TT)
-    # KK    += tril(KK,-1)'
+@inline function _prepare_matrices(KK,GG,Fb,RotationMatrices)
     KK = SparseMatrixCSC(Symmetric(KK,:L))
     dropzeros!(KK)
     dropzeros!(GG)   
-    transTT = SparseMatrixCSC(TT')
-    KK = transTT*KK*TT
-    GG = transTT*GG
-    Fb = transTT*Fb
+    KK = RotationMatrices.TTᵀ*KK*RotationMatrices.TT
+    GG = RotationMatrices.TTᵀ*GG
+    Fb = RotationMatrices.TTᵀ*Fb
     KK = SparseMatrixCSC(Symmetric(KK,:L))
     return KK,GG,Fb
 end
@@ -204,10 +205,8 @@ end
 
     idx     = 1:2:2*npt-1
     idx2    = 3*npt+1:4*npt
-    # ii      = Int32(0)
 
     @inbounds @fastmath for (ii, i) in enumerate(2*npt+1:3*npt)
-        # ii            += one(ii)
         cost           = cos(theta[ii]) 
         sint           = sin(theta[ii]) 
         i0             = idx[ii]
@@ -226,7 +225,10 @@ end
         # KK1_T[i2]      = sint # element (2,1) in the rotation matrix [TT] 
     end
     
-    return sparse(KKi_T,KKj_T,KK1_T)
+    TT = sparse(KKi_T,KKj_T,KK1_T)
+    transTT = SparseMatrixCSC(TT')
+
+    return RotationMatrix(TT, transTT)
 
 end
 

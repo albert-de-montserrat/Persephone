@@ -208,21 +208,43 @@ function get_tensor_and_rotate!(nu_11, nu_33, nu_55, nu_13, nu_15, nu_35,
     end
     r₂_imin = D.permutation_blk[argminsorted(v₂[nt])]
        
-    im = D.sblk*(r₁_imin-1) + r₂_imin
+    im1 = D.sblk*(r₁_imin-1) + r₂_imin
+    im2 = max(D.sblk*(r₁_imin-2) + r₂_imin-1, 1)
+    if im1 != im2
+        ax_upper = (log10(D.a[im1,1]/D.a[im1,2]), log10(D.a[im1,2]/D.a[im1,3]) )
+        ax_lower = (log10(D.a[im2,1]/D.a[im2,2]), log10(D.a[im2,2]/D.a[im2,3]) )
+        L = distance(ax_upper, ax_lower)
+        L2 = distance((r₁, r₂), ax_lower)
+        ΔL = L2/L
+        Cinterp = view(D.𝓒, im1, :)*(1-ΔL) .+ view(D.𝓒, im2, :)*ΔL
 
-    # Allocate stiffness tensor
-    C = @SMatrix [D.𝓒[im, 1]  D.𝓒[im, 7]  D.𝓒[im, 8]  0          0           0
-                  D.𝓒[im, 7]  D.𝓒[im, 2]  D.𝓒[im, 9]  0          0           0
-                  D.𝓒[im, 8]  D.𝓒[im, 9]  D.𝓒[im, 3]  0          0           0
-                  0           0           0           D.𝓒[im, 4] 0           0 
-                  0           0           0           0          D.𝓒[im, 5]  0
-                  0           0           0           0          0           D.𝓒[im, 6]]
+        # Allocate stiffness tensor
+        C = @SMatrix [Cinterp[1]  Cinterp[7]  Cinterp[8]  0          0           0
+                    Cinterp[7]  Cinterp[2]  Cinterp[9]  0          0           0
+                    Cinterp[8]  Cinterp[9]  Cinterp[3]  0          0           0
+                    0           0           0            max(Cinterp[4],D.w) 0           0 
+                    0           0           0           0           max(Cinterp[5],D.w)  0
+                    0           0           0           0          0           Cinterp[6]]
+    else
+        im = im1
+        # Allocate stiffness tensor
+        C = @SMatrix [D.𝓒[im, 1]  D.𝓒[im, 7]  D.𝓒[im, 8]  0          0           0
+                    D.𝓒[im, 7]  D.𝓒[im, 2]  D.𝓒[im, 9]    0          0           0
+                    D.𝓒[im, 8]  D.𝓒[im, 9]  D.𝓒[im, 3]    0          0           0
+                    0           0           0             max(D.𝓒[im, 4],D.w) 0           0 
+                    0           0           0             0          max(D.𝓒[im, 5],D.w)  0
+                    0           0           0             0          0           D.𝓒[im, 6]]
+    end
+
+        # C = @SMatrix [D.𝓒[100, 1]  D.𝓒[100, 7]  D.𝓒[100, 8]  0          0           0
+        #               D.𝓒[100, 7]  D.𝓒[100, 2]  D.𝓒[100, 9]  0          0           0
+        #               D.𝓒[100, 8]  D.𝓒[100, 9]  D.𝓒[100, 3]  0          0           0
+        #               0           0           0           D.𝓒[100, 4] 0           0 
+        #               0           0           0           0          D.𝓒[100, 5]  0
+        #               0           0           0           0          0           D.𝓒[100, 6]]
 
     # Rotation matrix
-    a = atand(FSEᵢ.y1, FSEᵢ.x1)
-    R = @SMatrix [cosd(a)  0   sind(a)
-                   0       1   0
-                 -sind(a)  0   cosd(a)]
+    R = rotmatrix(FSEᵢ.x1, FSEᵢ.y1)
     # Rotate tensor
     η11,η33,η55,η13,η15,η35 = directRotation2D(R,C)
     # Fill array
@@ -232,6 +254,13 @@ function get_tensor_and_rotate!(nu_11, nu_33, nu_55, nu_13, nu_15, nu_35,
     nu_13[i] = η13
     nu_15[i] = η15
     nu_35[i] = η35
+end
+
+function rotmatrix(x, y)
+    h = @muladd 1/√(y*y + x*x)
+    sina = y*h
+    cosa = x*h
+    return (cosa, sina, -sina)
 end
 
 function unrotate_anisotropic_tensor(𝓒,vx1,vx2,vy1,vy2)
@@ -431,21 +460,23 @@ function directRotation2D(R,C)
     h = C[1,3]
     # l = C[2,3]
     ## Rotation matrix
-    x1 = R[1,1]
-    x2 = R[1,3]
-    y1 = R[3,1]
-    y2 = R[3,3]
+    x1 = y2 = R[1]
+    x2 = R[2]
+    y1 = R[3]
     ## Rotated components
-    n11 = (c * x2 ^ 2 + h * x1 ^ 2 + 4 * e * x1 ^ 2) * x2 ^ 2 + (a * x1 ^ 2 + h * x2 ^ 2) * x1 ^ 2;
-    n33 = (c * y2 ^ 2 + h * y1 ^ 2 + 4 * e * y1 ^ 2) * y2 ^ 2 + (a * y1 ^ 2 + h * y2 ^ 2) * y1 ^ 2;
-    n55 = (c * x2 * y2 + h * x1 * y1) * x2 * y2 + (x1 * y2 + x2 * y1) ^ 2 * e + (a * x1 * y1 + h * x2 * y2) * x1 * y1;
-    n13 = ((c * x2 ^ 2 + h * x1 ^ 2) * y2 + 4 * e * x1 * x2 * y1) * y2 + (a * x1 ^ 2 + h * x2 ^ 2) * y1 ^ 2;
-    n15 = ((c * x2 ^ 2 + h * x1 ^ 2) * y2 + 2 * (x1 * y2 + x2 * y1) * e * x1) * x2 + (a * x1 ^ 2 + h * x2 ^ 2) * x1 * y1;
-    n35 = ((c * y2 ^ 2 + h * y1 ^ 2) * x2 + 2 * (x1 * y2 + x2 * y1) * e * y1) * y2 + (a * y1 ^ 2 + h * y2 ^ 2) * x1 * y1;
+    x1x1 = x1*x1
+    x2x2 = x2*x2
+    y1y1 = y1*y1
+    y2y2 = y2*y2
+    n11 = @muladd (c * x2x2 + h * x1x1 + 4 * e * x1x1) * x2x2 + (a * x1x1 + h * x2x2) * x1x1
+    n33 = @muladd (c * y2y2 + h * y1y1 + 4 * e * y1y1) * y2y2 + (a * y1y1 + h * y2y2) * y1y1
+    n55 = @muladd (c * x2 * y2 + h * x1 * y1) * x2 * y2 + (x1 * y2 + x2 * y1) *(x1 * y2 + x2 * y1) * e + (a * x1 * y1 + h * x2 * y2) * x1 * y1
+    n13 = @muladd ((c * x2x2 + h * x1x1) * y2 + 4 * e * x1 * x2 * y1) * y2 + (a * x1x1 + h * x2x2) * y1y1
+    n15 = @muladd ((c * x2x2 + h * x1x1) * y2 + 2 * (x1 * y2 + x2 * y1) * e * x1) * x2 + (a * x1x1 + h * x2x2) * x1 * y1
+    n35 = @muladd ((c * y2y2 + h * y1y1) * x2 + 2 * (x1 * y2 + x2 * y1) * e * y1) * y2 + (a * y1y1 + h * y2y2) * x1 * y1
 
-    return n11,n33,n55,n13,n15,n35
+    return n11, n33, n55, n13, n15, n35
 end
-
 
 function directRotation(R,C)
     @fastmath begin
@@ -470,9 +501,9 @@ function directRotation(R,C)
         z2 = R[3,2]
         z3 = R[3,3]
         ## Rotated components
-        n11 = 4 * ((e * x3 ^ 2 + f * x2 ^ 2) * x1 ^ 2 + d * x2 ^ 2 * x3 ^ 2) + (h * x1 ^ 2 + l * x2 ^ 2 + c * x3 ^ 2) * x3 ^ 2 + (g * x2 ^ 2 + h * x3 ^ 2 + a * x1 ^ 2) * x1 ^ 2 + (g * x1 ^ 2 + l * x3 ^ 2 + b * x2 ^ 2) * x2 ^ 2
-        n13 = 4 * ((e * x3 * z3 + f * x2 * z2) * x1 * z1 + d * x2 * x3 * z2 * z3) + (h * x1 ^ 2 + l * x2 ^ 2 + c * x3 ^ 2) * z3 ^ 2 + (g * x2 ^ 2 + h * x3 ^ 2 + a * x1 ^ 2) * z1 ^ 2 + (g * x1 ^ 2 + l * x3 ^ 2 + b * x2 ^ 2) * z2 ^ 2
-        n15 = 2 * (((x1 * z3 + x3 * z1) * e * x1 + (y1 * z3 + y3 * z1) * d * x2) * x3 + (x1 * y3 + x3 * y1) * f * x1 * x2) + (h * x1 ^ 2 + l * x2 ^ 2 + c * x3 ^ 2) * x3 * z3 + (g * x2 ^ 2 + h * x3 ^ 2 + a * x1 ^ 2) * x1 * z1 + (g * x1 ^ 2 + l * x3 ^ 2 + b * x2 ^ 2) * x2 * z2
+        n11 = 4 * ((e * x3 ^ 2 + f * x2 ^ 2) * x1*x1 + d * x2 ^ 2 * x3 ^ 2) + (h * x1*x1 + l * x2 ^ 2 + c * x3 ^ 2) * x3 ^ 2 + (g * x2 ^ 2 + h * x3 ^ 2 + a * x1*x1) * x1*x1 + (g * x1*x1 + l * x3 ^ 2 + b * x2 ^ 2) * x2 ^ 2
+        n13 = 4 * ((e * x3 * z3 + f * x2 * z2) * x1 * z1 + d * x2 * x3 * z2 * z3) + (h * x1*x1 + l * x2 ^ 2 + c * x3 ^ 2) * z3 ^ 2 + (g * x2 ^ 2 + h * x3 ^ 2 + a * x1*x1) * z1 ^ 2 + (g * x1*x1 + l * x3 ^ 2 + b * x2 ^ 2) * z2 ^ 2
+        n15 = 2 * (((x1 * z3 + x3 * z1) * e * x1 + (y1 * z3 + y3 * z1) * d * x2) * x3 + (x1 * y3 + x3 * y1) * f * x1 * x2) + (h * x1*x1 + l * x2 ^ 2 + c * x3 ^ 2) * x3 * z3 + (g * x2 ^ 2 + h * x3 ^ 2 + a * x1*x1) * x1 * z1 + (g * x1*x1 + l * x3 ^ 2 + b * x2 ^ 2) * x2 * z2
         n33 = 4 * ((e * z3 ^ 2 + f * z2 ^ 2) * z1 ^ 2 + d * z2 ^ 2 * z3 ^ 2) + (h * z1 ^ 2 + l * z2 ^ 2 + c * z3 ^ 2) * z3 ^ 2 + (g * z2 ^ 2 + h * z3 ^ 2 + a * z1 ^ 2) * z1 ^ 2 + (g * z1 ^ 2 + l * z3 ^ 2 + b * z2 ^ 2) * z2 ^ 2
         n35 = 2 * (((x1 * z3 + x3 * z1) * e * z1 + (y1 * z3 + y3 * z1) * d * z2) * z3 + (x1 * y3 + x3 * y1) * f * z1 * z2) + (h * z1 ^ 2 + l * z2 ^ 2 + c * z3 ^ 2) * x3 * z3 + (g * z2 ^ 2 + h * z3 ^ 2 + a * z1 ^ 2) * x1 * z1 + (g * z1 ^ 2 + l * z3 ^ 2 + b * z2 ^ 2) * x2 * z2
         n55 = (x1 * z3 + x3 * z1) ^ 2 * e + (y1 * z3 + y3 * z1) ^ 2 * d + (x1 * y3 + x3 * y1) ^ 2 * f + (h * x1 * z1 + l * x2 * z2 + c * x3 * z3) * x3 * z3 + (g * x2 * z2 + h * x3 * z3 + a * x1 * z1) * x1 * z1 + (g * x1 * z1 + l * x3 * z3 + b * x2 * z2) * x2 * z2
@@ -504,23 +535,23 @@ function directRotation!(n, R, C)
     z2 = R[3,2]
     z3 = R[3,3]
     ## Rotated components
-    n[1,1] = 4 * ((e * x3 ^ 2 + f * x2 ^ 2) * x1 ^ 2 + d * x2 ^ 2 * x3 ^ 2) + (h * x1 ^ 2 + l * x2 ^ 2 + c * x3 ^ 2) * x3 ^ 2 + (g * x2 ^ 2 + h * x3 ^ 2 + a * x1 ^ 2) * x1 ^ 2 + (g * x1 ^ 2 + l * x3 ^ 2 + b * x2 ^ 2) * x2 ^ 2
-    n[1,2] = n[1,2] = 4 * ((e * x3 * y3 + f * x2 * y2) * x1 * y1 + d * x2 * x3 * y2 * y3) + (h * x1 ^ 2 + l * x2 ^ 2 + c * x3 ^ 2) * y3 ^ 2 + (g * x2 ^ 2 + h * x3 ^ 2 + a * x1 ^ 2) * y1 ^ 2 + (g * x1 ^ 2 + l * x3 ^ 2 + b * x2 ^ 2) * y2 ^ 2
-    n[2,2] = 4 * ((e * y3 ^ 2 + f * y2 ^ 2) * y1 ^ 2 + d * y2 ^ 2 * y3 ^ 2) + (h * y1 ^ 2 + l * y2 ^ 2 + c * y3 ^ 2) * y3 ^ 2 + (g * y2 ^ 2 + h * y3 ^ 2 + a * y1 ^ 2) * y1 ^ 2 + (g * y1 ^ 2 + l * y3 ^ 2 + b * y2 ^ 2) * y2 ^ 2
-    n[1,3] = n[1,3] = 4 * ((e * x3 * z3 + f * x2 * z2) * x1 * z1 + d * x2 * x3 * z2 * z3) + (h * x1 ^ 2 + l * x2 ^ 2 + c * x3 ^ 2) * z3 ^ 2 + (g * x2 ^ 2 + h * x3 ^ 2 + a * x1 ^ 2) * z1 ^ 2 + (g * x1 ^ 2 + l * x3 ^ 2 + b * x2 ^ 2) * z2 ^ 2
-    n[2,3] = n[3,2] = 4 * ((e * y3 * z3 + f * y2 * z2) * y1 * z1 + d * y2 * y3 * z2 * z3) + (h * y1 ^ 2 + l * y2 ^ 2 + c * y3 ^ 2) * z3 ^ 2 + (g * y2 ^ 2 + h * y3 ^ 2 + a * y1 ^ 2) * z1 ^ 2 + (g * y1 ^ 2 + l * y3 ^ 2 + b * y2 ^ 2) * z2 ^ 2
+    n[1,1] = 4 * ((e * x3 ^ 2 + f * x2 ^ 2) * x1*x1 + d * x2 ^ 2 * x3 ^ 2) + (h * x1*x1 + l * x2 ^ 2 + c * x3 ^ 2) * x3 ^ 2 + (g * x2 ^ 2 + h * x3 ^ 2 + a * x1*x1) * x1*x1 + (g * x1*x1 + l * x3 ^ 2 + b * x2 ^ 2) * x2 ^ 2
+    n[1,2] = n[1,2] = 4 * ((e * x3 * y3 + f * x2 * y2) * x1 * y1 + d * x2 * x3 * y2 * y3) + (h * x1*x1 + l * x2 ^ 2 + c * x3 ^ 2) * y3 ^ 2 + (g * x2 ^ 2 + h * x3 ^ 2 + a * x1*x1) * y1*y1 + (g * x1*x1 + l * x3 ^ 2 + b * x2 ^ 2) * y2*y2
+    n[2,2] = 4 * ((e * y3 ^ 2 + f * y2*y2) * y1*y1 + d * y2*y2 * y3 ^ 2) + (h * y1*y1 + l * y2*y2 + c * y3 ^ 2) * y3 ^ 2 + (g * y2*y2 + h * y3 ^ 2 + a * y1*y1) * y1*y1 + (g * y1*y1 + l * y3 ^ 2 + b * y2*y2) * y2*y2
+    n[1,3] = n[1,3] = 4 * ((e * x3 * z3 + f * x2 * z2) * x1 * z1 + d * x2 * x3 * z2 * z3) + (h * x1*x1 + l * x2 ^ 2 + c * x3 ^ 2) * z3 ^ 2 + (g * x2 ^ 2 + h * x3 ^ 2 + a * x1*x1) * z1 ^ 2 + (g * x1*x1 + l * x3 ^ 2 + b * x2 ^ 2) * z2 ^ 2
+    n[2,3] = n[3,2] = 4 * ((e * y3 * z3 + f * y2 * z2) * y1 * z1 + d * y2 * y3 * z2 * z3) + (h * y1*y1 + l * y2*y2 + c * y3 ^ 2) * z3 ^ 2 + (g * y2*y2 + h * y3 ^ 2 + a * y1*y1) * z1 ^ 2 + (g * y1*y1 + l * y3 ^ 2 + b * y2*y2) * z2 ^ 2
     n[3,3] = 4 * ((e * z3 ^ 2 + f * z2 ^ 2) * z1 ^ 2 + d * z2 ^ 2 * z3 ^ 2) + (h * z1 ^ 2 + l * z2 ^ 2 + c * z3 ^ 2) * z3 ^ 2 + (g * z2 ^ 2 + h * z3 ^ 2 + a * z1 ^ 2) * z1 ^ 2 + (g * z1 ^ 2 + l * z3 ^ 2 + b * z2 ^ 2) * z2 ^ 2
-    n[1,4] = n[1,4] = 2 * (((x2 * z3 + x3 * z2) * e * x1 + (y2 * z3 + y3 * z2) * d * x2) * x3 + (x2 * y3 + x3 * y2) * f * x1 * x2) + (h * x1 ^ 2 + l * x2 ^ 2 + c * x3 ^ 2) * y3 * z3 + (g * x2 ^ 2 + h * x3 ^ 2 + a * x1 ^ 2) * y1 * z1 + (g * x1 ^ 2 + l * x3 ^ 2 + b * x2 ^ 2) * y2 * z2
-    n[2,4] = n[4,2] = 2 * (((x2 * z3 + x3 * z2) * e * y1 + (y2 * z3 + y3 * z2) * d * y2) * y3 + (x2 * y3 + x3 * y2) * f * y1 * y2) + (h * y1 ^ 2 + l * y2 ^ 2 + c * y3 ^ 2) * y3 * z3 + (g * y2 ^ 2 + h * y3 ^ 2 + a * y1 ^ 2) * y1 * z1 + (g * y1 ^ 2 + l * y3 ^ 2 + b * y2 ^ 2) * y2 * z2
+    n[1,4] = n[1,4] = 2 * (((x2 * z3 + x3 * z2) * e * x1 + (y2 * z3 + y3 * z2) * d * x2) * x3 + (x2 * y3 + x3 * y2) * f * x1 * x2) + (h * x1*x1 + l * x2 ^ 2 + c * x3 ^ 2) * y3 * z3 + (g * x2 ^ 2 + h * x3 ^ 2 + a * x1*x1) * y1 * z1 + (g * x1*x1 + l * x3 ^ 2 + b * x2 ^ 2) * y2 * z2
+    n[2,4] = n[4,2] = 2 * (((x2 * z3 + x3 * z2) * e * y1 + (y2 * z3 + y3 * z2) * d * y2) * y3 + (x2 * y3 + x3 * y2) * f * y1 * y2) + (h * y1*y1 + l * y2*y2 + c * y3 ^ 2) * y3 * z3 + (g * y2*y2 + h * y3 ^ 2 + a * y1*y1) * y1 * z1 + (g * y1*y1 + l * y3 ^ 2 + b * y2*y2) * y2 * z2
     n[3,4] = n[4,3] = 2 * (((x2 * z3 + x3 * z2) * e * z1 + (y2 * z3 + y3 * z2) * d * z2) * z3 + (x2 * y3 + x3 * y2) * f * z1 * z2) + (h * z1 ^ 2 + l * z2 ^ 2 + c * z3 ^ 2) * y3 * z3 + (g * z2 ^ 2 + h * z3 ^ 2 + a * z1 ^ 2) * y1 * z1 + (g * z1 ^ 2 + l * z3 ^ 2 + b * z2 ^ 2) * y2 * z2
     n[4,4] = (x2 * z3 + x3 * z2) ^ 2 * e + (y2 * z3 + y3 * z2) ^ 2 * d + (x2 * y3 + x3 * y2) ^ 2 * f + (h * y1 * z1 + l * y2 * z2 + c * y3 * z3) * y3 * z3 + (g * y2 * z2 + h * y3 * z3 + a * y1 * z1) * y1 * z1 + (g * y1 * z1 + l * y3 * z3 + b * y2 * z2) * y2 * z2
-    n[1,5] = n[5,1] = 2 * (((x1 * z3 + x3 * z1) * e * x1 + (y1 * z3 + y3 * z1) * d * x2) * x3 + (x1 * y3 + x3 * y1) * f * x1 * x2) + (h * x1 ^ 2 + l * x2 ^ 2 + c * x3 ^ 2) * x3 * z3 + (g * x2 ^ 2 + h * x3 ^ 2 + a * x1 ^ 2) * x1 * z1 + (g * x1 ^ 2 + l * x3 ^ 2 + b * x2 ^ 2) * x2 * z2
-    n[2,5] = n[5,2] = 2 * (((x1 * z3 + x3 * z1) * e * y1 + (y1 * z3 + y3 * z1) * d * y2) * y3 + (x1 * y3 + x3 * y1) * f * y1 * y2) + (h * y1 ^ 2 + l * y2 ^ 2 + c * y3 ^ 2) * x3 * z3 + (g * y2 ^ 2 + h * y3 ^ 2 + a * y1 ^ 2) * x1 * z1 + (g * y1 ^ 2 + l * y3 ^ 2 + b * y2 ^ 2) * x2 * z2
+    n[1,5] = n[5,1] = 2 * (((x1 * z3 + x3 * z1) * e * x1 + (y1 * z3 + y3 * z1) * d * x2) * x3 + (x1 * y3 + x3 * y1) * f * x1 * x2) + (h * x1*x1 + l * x2 ^ 2 + c * x3 ^ 2) * x3 * z3 + (g * x2 ^ 2 + h * x3 ^ 2 + a * x1*x1) * x1 * z1 + (g * x1*x1 + l * x3 ^ 2 + b * x2 ^ 2) * x2 * z2
+    n[2,5] = n[5,2] = 2 * (((x1 * z3 + x3 * z1) * e * y1 + (y1 * z3 + y3 * z1) * d * y2) * y3 + (x1 * y3 + x3 * y1) * f * y1 * y2) + (h * y1*y1 + l * y2*y2 + c * y3 ^ 2) * x3 * z3 + (g * y2*y2 + h * y3 ^ 2 + a * y1*y1) * x1 * z1 + (g * y1*y1 + l * y3 ^ 2 + b * y2*y2) * x2 * z2
     n[3,5] = n[5,3] = 2 * (((x1 * z3 + x3 * z1) * e * z1 + (y1 * z3 + y3 * z1) * d * z2) * z3 + (x1 * y3 + x3 * y1) * f * z1 * z2) + (h * z1 ^ 2 + l * z2 ^ 2 + c * z3 ^ 2) * x3 * z3 + (g * z2 ^ 2 + h * z3 ^ 2 + a * z1 ^ 2) * x1 * z1 + (g * z1 ^ 2 + l * z3 ^ 2 + b * z2 ^ 2) * x2 * z2
     n[4,5] = n[5,4] = (x1 * z3 + x3 * z1) * (x2 * z3 + x3 * z2) * e + (y1 * z3 + y3 * z1) * (y2 * z3 + y3 * z2) * d + (x1 * y3 + x3 * y1) * (x2 * y3 + x3 * y2) * f + (h * y1 * z1 + l * y2 * z2 + c * y3 * z3) * x3 * z3 + (g * y2 * z2 + h * y3 * z3 + a * y1 * z1) * x1 * z1 + (g * y1 * z1 + l * y3 * z3 + b * y2 * z2) * x2 * z2
     n[5,5] = (x1 * z3 + x3 * z1) ^ 2 * e + (y1 * z3 + y3 * z1) ^ 2 * d + (x1 * y3 + x3 * y1) ^ 2 * f + (h * x1 * z1 + l * x2 * z2 + c * x3 * z3) * x3 * z3 + (g * x2 * z2 + h * x3 * z3 + a * x1 * z1) * x1 * z1 + (g * x1 * z1 + l * x3 * z3 + b * x2 * z2) * x2 * z2
-    n[1,6] = n[6,1] = 2 * (((x1 * z2 + x2 * z1) * e * x1 + (y1 * z2 + y2 * z1) * d * x2) * x3 + (x1 * y2 + x2 * y1) * f * x1 * x2) + (h * x1 ^ 2 + l * x2 ^ 2 + c * x3 ^ 2) * x3 * y3 + (g * x2 ^ 2 + h * x3 ^ 2 + a * x1 ^ 2) * x1 * y1 + (g * x1 ^ 2 + l * x3 ^ 2 + b * x2 ^ 2) * x2 * y2
-    n[2,6] = n[6,2] = 2 * (((x1 * z2 + x2 * z1) * e * y1 + (y1 * z2 + y2 * z1) * d * y2) * y3 + (x1 * y2 + x2 * y1) * f * y1 * y2) + (h * y1 ^ 2 + l * y2 ^ 2 + c * y3 ^ 2) * x3 * y3 + (g * y2 ^ 2 + h * y3 ^ 2 + a * y1 ^ 2) * x1 * y1 + (g * y1 ^ 2 + l * y3 ^ 2 + b * y2 ^ 2) * x2 * y2
+    n[1,6] = n[6,1] = 2 * (((x1 * z2 + x2 * z1) * e * x1 + (y1 * z2 + y2 * z1) * d * x2) * x3 + (x1 * y2 + x2 * y1) * f * x1 * x2) + (h * x1*x1 + l * x2 ^ 2 + c * x3 ^ 2) * x3 * y3 + (g * x2 ^ 2 + h * x3 ^ 2 + a * x1*x1) * x1 * y1 + (g * x1*x1 + l * x3 ^ 2 + b * x2 ^ 2) * x2 * y2
+    n[2,6] = n[6,2] = 2 * (((x1 * z2 + x2 * z1) * e * y1 + (y1 * z2 + y2 * z1) * d * y2) * y3 + (x1 * y2 + x2 * y1) * f * y1 * y2) + (h * y1*y1 + l * y2*y2 + c * y3 ^ 2) * x3 * y3 + (g * y2*y2 + h * y3 ^ 2 + a * y1*y1) * x1 * y1 + (g * y1*y1 + l * y3 ^ 2 + b * y2*y2) * x2 * y2
     n[3,6] = n[6,3] = 2 * (((x1 * z2 + x2 * z1) * e * z1 + (y1 * z2 + y2 * z1) * d * z2) * z3 + (x1 * y2 + x2 * y1) * f * z1 * z2) + (h * z1 ^ 2 + l * z2 ^ 2 + c * z3 ^ 2) * x3 * y3 + (g * z2 ^ 2 + h * z3 ^ 2 + a * z1 ^ 2) * x1 * y1 + (g * z1 ^ 2 + l * z3 ^ 2 + b * z2 ^ 2) * x2 * y2
     n[4,6] = n[6,4] = (x1 * z2 + x2 * z1) * (x2 * z3 + x3 * z2) * e + (y1 * z2 + y2 * z1) * (y2 * z3 + y3 * z2) * d + (x1 * y2 + x2 * y1) * (x2 * y3 + x3 * y2) * f + (h * y1 * z1 + l * y2 * z2 + c * y3 * z3) * x3 * y3 + (g * y2 * z2 + h * y3 * z3 + a * y1 * z1) * x1 * y1 + (g * y1 * z1 + l * y3 * z3 + b * y2 * z2) * x2 * y2
     n[5,6] = n[6,5] = (x1 * z2 + x2 * z1) * (x1 * z3 + x3 * z1) * e + (y1 * z2 + y2 * z1) * (y1 * z3 + y3 * z1) * d + (x1 * y2 + x2 * y1) * (x1 * y3 + x3 * y1) * f + (h * x1 * z1 + l * x2 * z2 + c * x3 * z3) * x3 * y3 + (g * x2 * z2 + h * x3 * z3 + a * x1 * z1) * x1 * y1 + (g * x1 * z1 + l * x3 * z3 + b * x2 * z2) * x2 * y2

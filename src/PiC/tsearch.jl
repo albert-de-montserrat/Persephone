@@ -153,6 +153,7 @@ end
 @inline distance(p1::Point2D{Cartesian},p2::NamedTuple) = √((p1.x - p2.x)^2 + (p1.z - p2.z)^2)
 
 @inline distance(x1::T, z1::T, x2::T, z2::T) where {T<:Real} = √((x1-x2)^2 + (z1-z2)^2)
+@inline distance(p1::NTuple{2,T}, p2::NTuple{2,T}) where {T<:Real} = √((p1[1]-p2[1])^2 + (p1[2]-p2[2])^2)
 
 @inline getcentroid(p1::Point2D{Cartesian},p2::Point2D{Cartesian},p3::Point2D{Cartesian}) = 
     Point2D{Cartesian}((p1.x+p2.x+p3.x)/3,(p1.z+p2.z+p3.z)/3)

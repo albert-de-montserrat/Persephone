@@ -8,11 +8,12 @@ struct Sparsity{T}
 end
 
 function sparsitystokes(gr)
+    
     EL2NOD, EL2NODP = gr.e2n, gr.e2nP
-    ndim            = 2
-    nnodel          = size(EL2NOD,1)
-    nUdofel         = ndim * nnodel
-    nPdofel         = size(EL2NODP,1)
+    ndim = 2
+    nnodel = size(EL2NOD,1)
+    nUdofel = ndim * nnodel
+    nPdofel = size(EL2NODP,1)
    
     KKidx, GGidx, MMidx, invMMidx = _create_stokes_matrices(EL2NOD,EL2NODP,nUdofel,nPdofel,ndim)
 

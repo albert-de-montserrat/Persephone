@@ -15,14 +15,12 @@ function solveDiffusion_threaded(
     T,
     T0,
     TBC,
-    cuda,
     to,
 )
 
     ∂Ωt = TBC.Ω
     tfix = TBC.vfix
     tfree = TBC.ifree
-    # T0 .= deepcopy(T)
     copyto!(T0,T)
            
     @timeit to "Thermal diffusion threaded" begin
@@ -55,22 +53,16 @@ function solveDiffusion_threaded(
         end
 
         # Solve temperature
-        if cuda == :off
+        # if cuda == :off
             @timeit to "Solve" T[tfree] .= MT[tfree, tfree] \ FT[tfree]
         
-        else
-            @timeit to "Solve" sol, = Krylov.cg(
-                CuSparseMatrixCSC(MT[tfree, tfree]), 
-                CuVector(FT[tfree])
-            )
-            @timeit to "Fill T" @tturbo T[tfree] .=  Array(sol)
+        # else
+        #     @timeit to "Solve" sol, = Krylov.cg(
+        #         CuSparseMatrixCSC(MT[tfree, tfree]), 
+        #         CuVector(FT[tfree])
+        #     )
+        #     @timeit to "Fill T" @tturbo T[tfree] .=  Array(sol)
         
-        end
-
-        # @timeit to "Solve" begin 
-        #     ps, A_pardiso = _MKLfactorize(MT, FT, tfree)
-        #     _MKLsolve!(T, A_pardiso, ps, FT, tfree)
-        #     _MKLrelease!(ps)
         # end
 
         # Temperature increment
@@ -166,7 +158,8 @@ function assemble_element!(
     # Jacobian n. 1 (p:=polar, l:=local): reference element --> current element
     J_pl = dN3ds * coords
     # detJ_pl = det(J_pl) # fast |-> unrolled
-    detJ_pl = J_pl[1] * J_pl[4] - J_pl[2] * J_pl[3] # Determinant of Jacobi matrix
+    # detJ_pl = J_pl[1] * J_pl[4] - J_pl[2] * J_pl[3] # Determinant of Jacobi matrix
+    detJ_pl = muladd(J_pl[1], J_pl[4], -J_pl[2]*J_pl[3]) # Determinant of Jacobi matrix
 
     R_21 = r_el[2] - r_el[1] # = -detJa_PL*deta_dth
     R_31 = r_el[3] - r_el[1] # =  detJa_PL*dxi_dth
@@ -217,15 +210,14 @@ function assemble_element!(
         ω = r_ip * detJ_pl * w_ip[ip]
 
         # Update elemental matrices
-        # NxN = get_NxN(N_ip)
         NxN = N_ip' * N_ip
         Ke += (∂N∂x' * κ * ∂N∂x) * ω
         Me += NxN * ω * ρ_ip * Cp
 
-        # Force vector -- right hand side
-        if dQdT > 0
-            fe += N_ip' * (Δt * dQdT * ω)
-        end
+        # # Force vector -- right hand side
+        # if dQdT > 0
+        #     fe += N_ip' * (Δt * dQdT * ω)
+        # end
     end
 
     # Update stiffness matrix 
@@ -265,13 +257,6 @@ function update_force_vector!(F::Vector{Float64}, fe, el_dofs)
         F[i] += fe[_i]
     end
 end
-
-# function get_NxN(N::SArray{Tuple{3,3},Float64,2,9})
-#     NN = N'*N
-#     @SMatrix [NN[1,1]+NN[1,2]+NN[1,3] 0 0
-#               0  NN[2,1]+NN[2,2]+NN[2,3] 0
-#               0  0 NN[3,1]+NN[3,2]+NN[3,3]]
-# end
 
 get_NxN(N) = N' * N
 

@@ -24,16 +24,30 @@ function getFSE(F, FSE)
 end 
 
 function local_FSE!(FSE, F, iel)
+    # # Compute FSE
+    # eigval, evect = eigen(F[iel] * F[iel]')
+    # # Fill FSE
+    # @inbounds FSE[iel] = FiniteStrainEllipsoid(
+    #     evect[1,2]::Float64, # vx1
+    #     evect[1,1]::Float64, # vx2
+    #     evect[2,2]::Float64, # vy1
+    #     evect[2,1]::Float64, # vy2
+    #     √(abs(eigval[2]))::Float64, # a1 
+    #     √(abs(eigval[1]))::Float64, # a2
+    # )
+
     # Compute FSE
     eigval, evect = eigen(F[iel] * F[iel]')
     # Fill FSE
+    imax = eigval[2] > eigval[1] ? 2 : 1
+    imin = imax == 2 ? 1 : 2
     @inbounds FSE[iel] = FiniteStrainEllipsoid(
-        evect[1,2]::Float64, # vx1
-        evect[1,1]::Float64, # vx2
-        evect[2,2]::Float64, # vy1
-        evect[2,1]::Float64, # vy2
-        √(abs(eigval[2]))::Float64, # a1 
-        √(abs(eigval[1]))::Float64, # a2
+        evect[1,imax]::Float64, # vx1
+        evect[1,imin]::Float64, # vx2
+        evect[2,imax]::Float64, # vy1
+        evect[2,imin]::Float64, # vy2
+        √(abs(eigval[imax]))::Float64, # a1 
+        √(abs(eigval[imin]))::Float64, # a2
     )
 end
 
