@@ -555,11 +555,19 @@ function F2ip_inner_tkernel(F, particle_info, particle_fields, weight, nel)
 
     # Acummarray on each thread
     Threads.@threads for i in axes(weight,1)
+<<<<<<< HEAD
         # @inbounds ω = ntuple(j->weight[i,j], 6)
         @inbounds @views Fxx[Threads.threadid()][particle_info[i].t_parent, :]  .+= particle_fields.Fxx[i].* ntuple(j->weight[i,j], 6)
         @inbounds @views Fxz[Threads.threadid()][particle_info[i].t_parent, :]  .+= particle_fields.Fxz[i].* ntuple(j->weight[i,j], 6)
         @inbounds @views Fzx[Threads.threadid()][particle_info[i].t_parent, :]  .+= particle_fields.Fzx[i].* ntuple(j->weight[i,j], 6)
         @inbounds @views Fzz[Threads.threadid()][particle_info[i].t_parent, :]  .+= particle_fields.Fzz[i].* ntuple(j->weight[i,j], 6)
+=======
+#         @inbounds ω = ntuple(j->weight[i,j], 6)
+        @inbounds @views Fxx[Threads.threadid()][particle_info[i].t_parent, :] .+= particle_fields.Fxx[i].* ntuple(j->weight[i,j], 6)
+        @inbounds @views Fxz[Threads.threadid()][particle_info[i].t_parent, :] .+= particle_fields.Fxz[i].* ntuple(j->weight[i,j], 6)
+        @inbounds @views Fzx[Threads.threadid()][particle_info[i].t_parent, :] .+= particle_fields.Fzx[i].* ntuple(j->weight[i,j], 6)
+        @inbounds @views Fzz[Threads.threadid()][particle_info[i].t_parent, :] .+= particle_fields.Fzz[i].* ntuple(j->weight[i,j], 6)
+>>>>>>> eaf007132975fa77c6f3bd65b0e31ab5ef759f70
         @inbounds @views accw[Threads.threadid()][particle_info[i].t_parent, :] .+= ntuple(j->weight[i,j], 6)
     end
 
