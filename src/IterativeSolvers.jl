@@ -78,7 +78,7 @@
         
     end
 
-    _MKLrelease!(ps)
+    # _MKLrelease!(ps)
 
     return U,P
 
