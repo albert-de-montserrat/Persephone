@@ -171,5 +171,6 @@ export SymmetricTensor
 export Gradient
 export initstress
 export stress!
+export stress
 
 end # module

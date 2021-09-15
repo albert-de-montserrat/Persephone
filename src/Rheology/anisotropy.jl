@@ -209,23 +209,23 @@ function get_tensor_and_rotate!(nu_11, nu_33, nu_55, nu_13, nu_15, nu_35,
     r₂_imin = D.permutation_blk[argminsorted(v₂[nt])]
        
     im1 = D.sblk*(r₁_imin-1) + r₂_imin
-    im2 = max(D.sblk*(r₁_imin-2) + r₂_imin-1, 1)
-    if im1 != im2
-        ax_upper = (log10(D.a[im1,1]/D.a[im1,2]), log10(D.a[im1,2]/D.a[im1,3]) )
-        ax_lower = (log10(D.a[im2,1]/D.a[im2,2]), log10(D.a[im2,2]/D.a[im2,3]) )
-        L = distance(ax_upper, ax_lower)
-        L2 = distance((r₁, r₂), ax_lower)
-        ΔL = L2/L
-        Cinterp = view(D.𝓒, im1, :)*(1-ΔL) .+ view(D.𝓒, im2, :)*ΔL
+    # im2 = max(D.sblk*(r₁_imin-2) + r₂_imin-1, 1)
+    # if im1 != im2
+    #     ax_upper = (log10(D.a[im1,1]/D.a[im1,2]), log10(D.a[im1,2]/D.a[im1,3]) )
+    #     ax_lower = (log10(D.a[im2,1]/D.a[im2,2]), log10(D.a[im2,2]/D.a[im2,3]) )
+    #     L = distance(ax_upper, ax_lower)
+    #     L2 = distance((r₁, r₂), ax_lower)
+    #     ΔL = L2/L
+    #     Cinterp = view(D.𝓒, im1, :)*(1-ΔL) .+ view(D.𝓒, im2, :)*ΔL
 
-        # Allocate stiffness tensor
-        C = @SMatrix [Cinterp[1]  Cinterp[7]  Cinterp[8]  0          0           0
-                    Cinterp[7]  Cinterp[2]  Cinterp[9]  0          0           0
-                    Cinterp[8]  Cinterp[9]  Cinterp[3]  0          0           0
-                    0           0           0            max(Cinterp[4],D.w) 0           0 
-                    0           0           0           0           max(Cinterp[5],D.w)  0
-                    0           0           0           0          0           Cinterp[6]]
-    else
+    #     # Allocate stiffness tensor
+    #     C = @SMatrix [Cinterp[1]  Cinterp[7]  Cinterp[8]  0          0           0
+    #                 Cinterp[7]  Cinterp[2]  Cinterp[9]  0          0           0
+    #                 Cinterp[8]  Cinterp[9]  Cinterp[3]  0          0           0
+    #                 0           0           0            max(Cinterp[4],D.w) 0           0 
+    #                 0           0           0           0           max(Cinterp[5],D.w)  0
+    #                 0           0           0           0          0           Cinterp[6]]
+    # else
         im = im1
         # Allocate stiffness tensor
         C = @SMatrix [D.𝓒[im, 1]  D.𝓒[im, 7]  D.𝓒[im, 8]  0          0           0
@@ -234,7 +234,7 @@ function get_tensor_and_rotate!(nu_11, nu_33, nu_55, nu_13, nu_15, nu_35,
                     0           0           0             max(D.𝓒[im, 4],D.w) 0           0 
                     0           0           0             0          max(D.𝓒[im, 5],D.w)  0
                     0           0           0             0          0           D.𝓒[im, 6]]
-    end
+    # end
 
         # C = @SMatrix [D.𝓒[100, 1]  D.𝓒[100, 7]  D.𝓒[100, 8]  0          0           0
         #               D.𝓒[100, 7]  D.𝓒[100, 2]  D.𝓒[100, 9]  0          0           0

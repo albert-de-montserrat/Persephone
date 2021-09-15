@@ -14,7 +14,7 @@ function main()
     else
         path = "/home/albert/Desktop/output"
     end
-    folder = "AnisoRandom4_new_stress"
+    folder = "Iso_new_fse_new_stress"
     OUT, iplot = setup_output(path, folder)
 
     #=========================================================================
@@ -81,7 +81,7 @@ function main()
     fixangles6!(θ6)
     fixangles!(θ3)
     ipx, ipz = getips(gr.e2n, θ6, r6 )
-    # ix, iz = polar2cartesian(ipx, ipz)
+    ix, iz = polar2cartesian(ipx, ipz)
     transition = 2.22-0.2276
     # isotropic_idx = findall(ipz .> transition)
     IntC = [@inbounds(Point2D{Polar}(ipx[i], ipz[i])) for i in CartesianIndices(ipx)] # → ip coordinates
@@ -110,7 +110,7 @@ function main()
     # Initialise temperature @ particles
     init_particle_temperature!(particle_fields, particle_info, type = perturbation)
 
-    viscosity_type = :IsoviscousAnisotropic
+    viscosity_type = :IsoviscousIsotropic
     #= Options:
         (*) "IsoviscousIsotropic"
         (*) "TemperatureDependantIsotropic"
@@ -173,7 +173,7 @@ function main()
     Time = 0.0
     T0 = deepcopy(T)
 
-    for iplot in 1:150
+    for iplot in 1:50
         for _ in 1:50
             reset_timer!(to)
 
@@ -218,7 +218,7 @@ function main()
                 # F, τ, ε, = stress(
                 #     Ucart, T, F, 𝓒, τ, ε, gr.e2n, θStokes, rStokes, η, PhaseID, Δt
                 # )
-                stress!(F, U, gr.nel, DoF_U, coordinates, 6, SF_Stokes, Δt)
+                stress!(F, Ucart, gr.nel, DoF_U, coordinates, 6, SF_Stokes, Δt)
                 # shear_heating = shearheating(τ, ε)
             end
 
