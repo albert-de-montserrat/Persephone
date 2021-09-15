@@ -15,15 +15,9 @@
     Rhs += spmv(GG, P)
 
     # guess of the velocity field 
-    # U,F = _CholeskyFactorizationSolve(U, KK, Rhs, ifree) # return factorization F to speed up next direct solvers
-    ps, A_pardiso = _MKLfactorize(KK, Rhs, ifree)
-    _MKLsolve!(U, A_pardiso, ps, Rhs, ifree)
-
-    # sol, = Krylov.cg(
-    #     CuSparseMatrixCSC(KK[tfree, tfree]), 
-    #     CuVector(Rhs[tfree])
-    # ) 
-    # @tturbo T[tfree] .=  Array(sol)
+    U,F = _CholeskyFactorizationSolve(U, KK, Rhs, ifree) # return factorization F to speed up next direct solvers
+    # ps, A_pardiso = _MKLfactorize(KK, Rhs, ifree)
+    # _MKLsolve!(U, A_pardiso, ps, Rhs, ifree)
 
     # initial pressure residual vector
     GGtransp = sparse(GG')
@@ -33,7 +27,7 @@
     tol = Prms * rtol_Pat
     # get preconditioner
     MM, pc = _preconditioner("jacobi", MM)
-    MM, pc = _preconditioner("lumped", MM)
+    # MM, pc = _preconditioner("lumped", MM)
     
     # Begin of Patera pressure iterations 
     # d = _precondition(pc, MM, r) # precondition residual
@@ -51,20 +45,13 @@
             Sq = S * q = (G' * Kinv * G) * q
             Hence, the muliplicatipon is done in 3 steps:
             (1) y   = G*q
-            (2) K z = y (TODO PARDISO direct solver)
+            (2) K z = y
             (3) Sq  = G'*z
         =============================================================#
         # y = GG*q
         y = spmv(GG, q)
-        # _CholeskyWithFactorization!(z, F, y, ifree)
-        _MKLsolve!(z, A_pardiso, ps, y, ifree)
-
-        # sol, = Krylov.cg(
-        #     CuSparseMatrixCSC(KK[tfree, tfree]), 
-        #     CuVector(y[tfree])
-        # ) 
-        # @tturbo z[tfree] .=  Array(sol)
-        
+        _CholeskyWithFactorization!(z, F, y, ifree)
+        # _MKLsolve!(z, A_pardiso, ps, y, ifree)       
         Sq = GGtransp*z
         qSq = mydot(q,Sq) # denominator to calculate alpha
         copyto!(rlast, r) # needed for Polak-Ribiere version 1
@@ -74,6 +61,7 @@
         _updatesolution!(P,U,r,q,z,Sq,α)
         # remove nullspace
         rm0space!(r)
+
         # Check convergence 
         Prrms = mynorm(r)
         if Prrms < tol && itPat>=itmin_Pat
@@ -81,13 +69,11 @@
             break
         end
 
-        fill!(z, 0.0)
+        # fill!(z, 0.0)
 
         d  = _precondition(pc, r) # precondition residual
-        # d = _precondition(pc, MM, r) # precondition rsidual
         # Make new search direction q S-orthogonal to all previous q's
         β  = mydot(r-rlast,d)/rd # Polak-Ribiere version 1        
-        # q  = d + β*q # calculate NEW search direction
         xpy!(q, d, β)
         
     end

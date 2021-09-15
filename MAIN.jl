@@ -14,14 +14,14 @@ function main()
     else
         path = "/home/albert/Desktop/output"
     end
-    folder = "AnisoRandom4_noInjection4"
+    folder = "AnisoRandom4_new_stress"
     OUT, iplot = setup_output(path, folder)
 
     #=========================================================================
         MAKE GRID
     =========================================================================#
     split = 2
-    N = 4
+    N = 3
     if split == 1
         nr = Int(1 + 2^N)
         nθ = Int(12 * 2^N)
@@ -143,16 +143,16 @@ function main()
     # Allocate spasity pattern of thermal diffusion stiffness matrix
     CMidx, _ = sparsitythermal(gr.e2n, 6)
 
-    # # Stokes immutables
-    # KS, GS, MS, FS, DoF_U, DoF_P, nn, SF_Stokes, ScratchStokes = stokes_immutables(
-    #     gr, nnod, 2, 3, 6, gr.nel, 7
-    # )
+    # Stokes immutables
+    KS, GS, MS, FS, DoF_U, DoF_P, nn, SF_Stokes, ScratchStokes = stokes_immutables(
+        gr, nnod, 2, 3, 6, gr.nel, 7
+    )
 
     # Diffusion_immutables
     KT, MT, FT, DoF_T, valA, SF_Diffusion, ScratchDifussion = diffusion_immutables(
         gr, 2, 3, 6, 7
     )
-    #(gr.e2n, nnod, ndim, nvert, nnodel, gr.nel, nip)
+
     # Color elements
     _, color_list = color_mesh(gr.e2n)
 
@@ -173,7 +173,7 @@ function main()
     Time = 0.0
     T0 = deepcopy(T)
 
-    for iplot in 1:50
+    for iplot in 1:150
         for _ in 1:50
             reset_timer!(to)
 
@@ -215,9 +215,10 @@ function main()
                 #=
                     Stress-Strain postprocessor
                 =#
-                F, τ, ε, = stress(
-                    Ucart, T, F, 𝓒, τ, ε, gr.e2n, θStokes, rStokes, η, PhaseID, Δt
-                )
+                # F, τ, ε, = stress(
+                #     Ucart, T, F, 𝓒, τ, ε, gr.e2n, θStokes, rStokes, η, PhaseID, Δt
+                # )
+                stress!(F, U, gr.nel, DoF_U, coordinates, 6, SF_Stokes, Δt)
                 # shear_heating = shearheating(τ, ε)
             end
 
