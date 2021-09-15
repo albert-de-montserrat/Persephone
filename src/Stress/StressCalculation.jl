@@ -156,13 +156,8 @@ function stress(U, T, F, 𝓒, τ, ε, EL2NOD, theta, r, η, PhaseID, Δt)
     nel = size(EL2NOD,2)
     nUdofel = ndim*nnodel
     EL2DOF = Array{Int32}(undef,nUdofel,nel)
-<<<<<<< HEAD
     @views EL2DOF[1:ndim:nUdofel,:] .= @. ndim*(EL2NOD[1:nnodel,:]-1) + 1
     @views EL2DOF[2:ndim:nUdofel,:] .= @. ndim*(EL2NOD[1:nnodel,:]-1) + 2
-=======
-    EL2DOF[1:ndim:nUdofel,:] .= @. ndim*(EL2NOD[1:nnodel,:]-1) + 1
-    EL2DOF[2:ndim:nUdofel,:] .= @. ndim*(EL2NOD[1:nnodel,:]-1) + 2
->>>>>>> eaf007132975fa77c6f3bd65b0e31ab5ef759f70
     nelblk = min(nel, 1200)
     nblk = ceil(Int,nel/nelblk)
     il = one(nelblk); iu = nelblk
