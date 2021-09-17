@@ -4,9 +4,9 @@ function _MKLfactorize(KK:: SparseMatrixCSC,Rhs::Vector,ifree::Vector; verbose =
     B  = Rhs[ifree]
     # Initialize the PARDISO internal data structures.
     ps = MKLPardisoSolver()
-#     if verbose
+    if verbose
         set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
-#     end
+    end
 
     # First set the matrix type to handle general real symmetric matrices
     set_matrixtype!(ps, Pardiso.REAL_SYM_POSDEF)
