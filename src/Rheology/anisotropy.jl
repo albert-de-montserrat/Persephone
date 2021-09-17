@@ -12,7 +12,7 @@ end
 """
 𝓒init(nel,nip) = StiffnessTensor(fill(4/3,nel,nip), 
                                  fill(4/3,nel,nip), 
-                                 fill(1.0,nel,nip), 
+                                 fill(2.0,nel,nip), 
                                  fill(-2/3,nel,nip), 
                                  fill(0.0,nel,nip), 
                                  fill(0.0,nel,nip))
@@ -26,7 +26,7 @@ end
 struct DEM 
     𝓒::Matrix{Float64}
     a::Matrix{Float64}
-    ϕ::Vector{Float64}
+    ϕ::Float64
     w::Float64
     a1a2_blk::Vector{Float64}
     a2a3_blk::Vector{Float64}
@@ -65,7 +65,7 @@ function getDEM(fname, Δη, ϕ)
     ax3   = view(axis,:,3)
     a1a2  = @. log10(ax1/ax2)
     a2a3  = @. log10(ax2/ax3)
-    a2a3_blk, permutation_blk, sblk, nblk = sort_axes(a2a3,a1a2)
+    a2a3_blk, permutation_blk, sblk, nblk = sort_axes(a2a3, a1a2)
     idx = 1:sblk:length(a2a3)   
     # idx = 1:sblk
     a1a2_blk = view(a1a2,idx)
@@ -73,7 +73,8 @@ function getDEM(fname, Δη, ϕ)
     DEM(
         tensor,
         axis, 
-        dropdims(volume,dims=2),
+        # dropdims(volume,dims=2),
+        volume,
         η_cutoff,
         Array(a1a2_blk),
         Array(a2a3_blk), 
@@ -93,7 +94,7 @@ function get_stride(v::Vector)
     return i
 end
 
-function sort_axes(a2a3,a1a2)
+function sort_axes(a2a3, a1a2)
     sblk = get_stride(a1a2) # block size
     nblk = div(length(a2a3),sblk)+1 # number of blocksa1
     blk = 1:sblk

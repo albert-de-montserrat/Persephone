@@ -4,6 +4,8 @@ function _MKLfactorize(KK:: SparseMatrixCSC,Rhs::Vector,ifree::Vector; verbose =
     B  = Rhs[ifree]
     # Initialize the PARDISO internal data structures.
     ps = MKLPardisoSolver()
+    set_nprocs!(ps, Threads.nthreads())
+    
     if verbose
         set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
     end

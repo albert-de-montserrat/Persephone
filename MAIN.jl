@@ -29,8 +29,8 @@ function main()
     else
         nr = Int(1+2^N)
         nθ = Int(12*2^N)
-        # nr = Int(1 + 32)
-        # nθ = Int(256)
+        nr = Int(1 + 32)
+        nθ = Int(256)
         gr = Grid(nθ, nr)
     end
     IDs = point_ids(gr)
@@ -61,7 +61,8 @@ function main()
         GET DEM STRUCTURE:    
     =========================================================================#
     dem_file = joinpath("DEM", "DEM_1e-3_vol20_new3.h5")
-    Δη, ϕ = 1e-3, 0.2
+    dem_file = joinpath("newDEM", "Dem_1e-3_vol30.h5")
+    Δη, ϕ = 1e-3, 0.3
     D = getDEM(dem_file, Δη, ϕ)
 
     #=========================================================================
@@ -127,7 +128,10 @@ function main()
     )
 
     ρ = state_equation(VarT.α, T)
-    η = getviscosity(T, viscosity_type, η = 1.81) # η = 1 for isotropic,  η = 1.81 for aniisotropic
+    η = getviscosity(T, viscosity_type, η = 1/0.6899025321942348) 
+    	# η = 1 for isotropic
+    	# η = 1.81 for anisotropic with phi = 30%
+    	# η = 1/0.6899025321942348 for anisotropic with phi = 20%
     Valη = Val(η)
     g = 1e4
     𝓒 = anisotropic_tensor(FSE, D, Valη)
@@ -205,7 +209,7 @@ function main()
                 MMidx,
                 to,
             );
-            
+
             println("min:max Uθ", extrema(@views U[1:2:end]))
             println("mean speed  ", mean(@views @. (√(U[1:2:end]^2 + U[2:2:end]^2))))
 
