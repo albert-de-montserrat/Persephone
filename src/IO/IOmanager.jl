@@ -85,11 +85,11 @@ function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, nθ,
         VAR["y1"] = y1
         VAR["y2"] = y2
 
-        # particle variables
-        PART["x"] = xp
-        PART["z"] = zp
-        PART["t"] = t
-        PART["T"] = Tp
+#         # particle variables
+#         PART["x"] = xp
+#         PART["z"] = zp
+#         PART["t"] = t
+#         PART["T"] = Tp
         
 
     end
@@ -174,11 +174,11 @@ function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, nθ, nr,
         VAR["y1"] = y1
         VAR["y2"] = y2
         
-        # particle variables
-        PART["x"] = xp
-        PART["z"] = zp
-        PART["t"] = t
-        PART["T"] = Tp
+#         # particle variables
+#         PART["x"] = xp
+#         PART["z"] = zp
+#         PART["t"] = t
+#         PART["T"] = Tp
 
     end
 end
