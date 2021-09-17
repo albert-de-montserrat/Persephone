@@ -15,9 +15,9 @@
     Rhs += spmv(GG, P)
 
     # guess of the velocity field 
-    U,F = _CholeskyFactorizationSolve(U, KK, Rhs, ifree) # return factorization F to speed up next direct solvers
-    # ps, A_pardiso = _MKLfactorize(KK, Rhs, ifree)
-    # _MKLsolve!(U, A_pardiso, ps, Rhs, ifree)
+#     U,F = _CholeskyFactorizationSolve(U, KK, Rhs, ifree) # return factorization F to speed up next direct solvers
+    ps, A_pardiso = _MKLfactorize(KK, Rhs, ifree)
+    _MKLsolve!(U, A_pardiso, ps, Rhs, ifree)
 
     # initial pressure residual vector
     GGtransp = sparse(GG')
@@ -50,8 +50,8 @@
         =============================================================#
         # y = GG*q
         y = spmv(GG, q)
-        _CholeskyWithFactorization!(z, F, y, ifree)
-        # _MKLsolve!(z, A_pardiso, ps, y, ifree)       
+#         _CholeskyWithFactorization!(z, F, y, ifree)
+        _MKLsolve!(z, A_pardiso, ps, y, ifree)       
         Sq = GGtransp*z
         qSq = mydot(q,Sq) # denominator to calculate alpha
         copyto!(rlast, r) # needed for Polak-Ribiere version 1
@@ -78,7 +78,7 @@
         
     end
 
-    # _MKLrelease!(ps)
+    _MKLrelease!(ps)
 
     return U,P
 
