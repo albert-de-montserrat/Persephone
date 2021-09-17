@@ -8,7 +8,7 @@ function _MKLfactorize(KK:: SparseMatrixCSC,Rhs::Vector,ifree::Vector; verbose =
         set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
     end
 
-    set_nprocs!(ps, 8) 
+    set_nprocs!(ps, Threads.nthreads()) 
 
     # First set the matrix type to handle general real symmetric matrices
     set_matrixtype!(ps, Pardiso.REAL_SYM_POSDEF)
