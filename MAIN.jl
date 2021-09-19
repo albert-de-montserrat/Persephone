@@ -206,7 +206,7 @@ function main()
                 GGidx,
                 MMidx,
                 to,
-                solver == :suitesparse
+                solver = :suitesparse
             );
 
             println("min:max Uθ", extrema(@views U[1:2:end]))
