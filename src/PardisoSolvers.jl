@@ -4,18 +4,16 @@ function _MKLfactorize(KK:: SparseMatrixCSC,Rhs::Vector,ifree::Vector; verbose =
     B  = Rhs[ifree]
     # Initialize the PARDISO internal data structures.
     ps = MKLPardisoSolver()
-    set_nprocs!(ps, Threads.nthreads())
-    
+
     if verbose
         set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
     end
-
-    set_nprocs!(ps, 8) 
 
     # First set the matrix type to handle general real symmetric matrices
     set_matrixtype!(ps, Pardiso.REAL_SYM_POSDEF)
     # Initialize the default settings with the current matrix type
     pardisoinit(ps)
+    set_nprocs!(ps, Threads.nthreads())
 
     fix_iparm!(ps, :T)
     # Get the correct matrix to be sent into the pardiso function.
@@ -64,18 +62,15 @@ function _MKLpardiso!(T::Vector{Float64}, KK:: SparseMatrixCSC,Rhs::Vector{Float
     # Initialize the PARDISO internal data structures.
     # ps = PardisoSolver()
     ps = MKLPardisoSolver()
-    verbose = true
-    if verbose
-        set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
-    end
+    # if verbose
+    #     set_msglvl!(ps, Pardiso.MESSAGE_LEVEL_ON)
+    # end
 
-    set_nprocs!(ps, Threads.nthreads()) 
-
-    # set_nprocs!(ps, 4) # Sets the number of threads to use
     # First set the matrix type to handle general real symmetric matrices
     set_matrixtype!(ps, Pardiso.REAL_SYM_POSDEF)
     # Initialize the default settings with the current matrix type
     pardisoinit(ps)
+    set_nprocs!(ps, Threads.nthreads()) 
 
     # Remember that we pass in a CSC matrix to Pardiso, so need
     # to set the transpose iparm option.
@@ -84,33 +79,35 @@ function _MKLpardiso!(T::Vector{Float64}, KK:: SparseMatrixCSC,Rhs::Vector{Float
     # :N for normal matrix, :T for transpose, :C for conjugate
     A_pardiso = get_matrix(ps, A, :T)
 
+    T[ifree] .= solve(ps, A_pardiso, B)
+
     # solve!(ps,X, A, B)
 
-    # Analyze the matrix and compute a symbolic factorization.
-    set_phase!(ps, Pardiso.ANALYSIS)
-    # set_perm!(ps, randperm(n))
-    pardiso(ps, A_pardiso, B)
-    # @printf("The factors have %d nonzero entries.\n", get_iparm(ps, 18))
+    # # Analyze the matrix and compute a symbolic factorization.
+    # set_phase!(ps, Pardiso.ANALYSIS)
+    # # set_perm!(ps, randperm(n))
+    # pardiso(ps, A_pardiso, B)
+    # # @printf("The factors have %d nonzero entries.\n", get_iparm(ps, 18))
 
-    # Compute the numeric factorization.
-    set_phase!(ps, Pardiso.NUM_FACT)
-    pardiso(ps, A_pardiso, B)
-    # @printf("The matrix has %d positive and %d negative eigenvalues.\n",
-    #         get_iparm(ps, 22), get_iparm(ps, 23))
+    # # Compute the numeric factorization.
+    # set_phase!(ps, Pardiso.NUM_FACT)
+    # pardiso(ps, A_pardiso, B)
+    # # @printf("The matrix has %d positive and %d negative eigenvalues.\n",
+    # #         get_iparm(ps, 22), get_iparm(ps, 23))
 
-    # Compute the solutions X using the symbolic factorization.
-    set_phase!(ps, Pardiso.SOLVE_ITERATIVE_REFINE)
-    pardiso(ps, X, A_pardiso, B)
-    # @printf("PARDISO performed %d iterative refinement steps.\n", get_iparm(ps, 7))
+    # # Compute the solutions X using the symbolic factorization.
+    # set_phase!(ps, Pardiso.SOLVE_ITERATIVE_REFINE)
+    # pardiso(ps, X, A_pardiso, B)
+    # # @printf("PARDISO performed %d iterative refinement steps.\n", get_iparm(ps, 7))
 
-    # solve!(ps,X, A_pardiso, B)
-    # Free the PARDISO data structures.
-    set_phase!(ps, Pardiso.RELEASE_ALL)
-    pardiso(ps)
+    # # solve!(ps,X, A_pardiso, B)
+    # # Free the PARDISO data structures.
+    # set_phase!(ps, Pardiso.RELEASE_ALL)
+    # pardiso(ps)
 
-    @turbo for i ∈ 1:length(ifree)
-        T[ifree[i]] =  X[i]
-    end
+    # @tturbo for i ∈ 1:length(ifree)
+    #     T[ifree[i]] =  X[i]
+    # end
 
 end # END PARDISO SOLVER N.1
 

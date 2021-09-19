@@ -19,13 +19,13 @@ function particle_coordinates(P::Vector{PINFO}; coordinates_system = "cartesian"
     zp = similar(xp)
 
     if coordinates_system == "cartesian"
-        Threads.@threads for i in 1:np
+        @batch for i in 1:np
             @inbounds xp[i] = P[i].CCart.x
             @inbounds zp[i] = P[i].CCart.z
         end
 
     elseif coordinates_system == "polar"
-        Threads.@threads for i in 1:np
+        @batch for i in 1:np
             @inbounds xp[i] = P[i].CPolar.x
             @inbounds zp[i] = P[i].CPolar.z
         end
@@ -391,7 +391,6 @@ function interpolate_temperature!(
                         nr,
                         Δt,
                         ΔT,
-                        to
                     )
                     
     particle_fields = temperature2particle(
@@ -407,6 +406,7 @@ function interpolate_temperature!(
             nr,
             Δt,
         )
+        
     ΔT_remaining = ΔTsubgrid2node(
             ΔT,
             particle_fields,
@@ -445,20 +445,15 @@ end
     d = 1
 
     # loop
-    @batch for i in eachindex(particle_info)
-
-        # # -- Store old T
-        # @inbounds Tᵢ0[Threads.threadid()] = weightednode2particle(
-        #     view(T0, view(e2n_p1,:,particle_info[i].t)),
-        #     particle_weights[i].barycentric
-        #     )
-        
-        # # Δt_diff = ρᵢ[Threads.threadid()]*multiplier
-        # @inbounds particle_fields.ΔT_subgrid[i] = (Tᵢ0[Threads.threadid()] - particle_fields.T[i])*(1 - exp(-d*multiplier))
-        # @inbounds particle_fields.T[i] += particle_fields.ΔT_subgrid[i]
-        
-        @inbounds T[i], ΔT_subgrid[i] = _temperature2particle(T[i], view(T0, view(e2n_p1,:,t)),  particle_weights[i].barycentric, d, multiplier)
-
+    Threads.@threads for i in eachindex(particle_info)
+        @inbounds T[i], ΔT_subgrid[i] = 
+            _temperature2particle(
+                T[i], 
+                view(T0, view(e2n_p1,:,t)), 
+                particle_weights[i].barycentric,
+                d,
+                multiplier
+            )
     end
 
     particle_fields.T.= T

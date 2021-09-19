@@ -155,11 +155,8 @@ end
 @inline distance(x1::T, z1::T, x2::T, z2::T) where {T<:Real} = √((x1-x2)^2 + (z1-z2)^2)
 @inline distance(p1::NTuple{2,T}, p2::NTuple{2,T}) where {T<:Real} = √((p1[1]-p2[1])^2 + (p1[2]-p2[2])^2)
 
-@inline getcentroid(p1::Point2D{Cartesian},p2::Point2D{Cartesian},p3::Point2D{Cartesian}) = 
-    Point2D{Cartesian}((p1.x+p2.x+p3.x)/3,(p1.z+p2.z+p3.z)/3)
-
-@inline getcentroid(p1::Point2D{Polar},p2::Point2D{Polar},p3::Point2D{Polar}) = 
-    Point2D{Polar}((p1.x+p2.x+p3.x)/3,(p1.z+p2.z+p3.z)/3)
+@inline getcentroid(p1::Point2D{T},p2::Point2D{T},p3::Point2D{T}) where T = 
+    Point2D{T}((p1.x+p2.x+p3.x)/3,(p1.z+p2.z+p3.z)/3)
 
 @inline function barycentric_coordinates(bary_dummy, in, vc, pc)
     x1,x2,x3 = vc[1].x, vc[2].x, vc[3].x
@@ -167,13 +164,11 @@ end
     x,z      = pc.x, pc.z
     in       = false
 
-    bary_dummy[1] =
-        ((z2 - z3) * (x - x3) + (x3 - x2) * (z - z3)) /
+    bary_dummy[1] = @muladd ((z2 - z3) * (x - x3) + (x3 - x2) * (z - z3)) /
         ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
 
     if 0 <= bary_dummy[1] <= 1
-        bary_dummy[2] =
-            ((z3 - z1) * (x - x3) + (x1 - x3) * (z - z3)) /
+        bary_dummy[2] = @muladd  ((z3 - z1) * (x - x3) + (x1 - x3) * (z - z3)) /
             ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
 
         if 0 <= bary_dummy[2] <= 1
@@ -196,13 +191,11 @@ end ### END barycentric_coordinates FUNCTION ###################################
 
     bc1,bc2,bc3 = 0.0, 0.0, 0.0
 
-    bc1 =
-        ((z2 - z3) * (x - x3) + (x3 - x2) * (z - z3)) /
+    bc1 = @muladd ((z2 - z3) * (x - x3) + (x3 - x2) * (z - z3)) /
         ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
 
     if 0 <= bc1 <= 1
-        bc2 =
-            ((z3 - z1) * (x - x3) + (x1 - x3) * (z - z3)) /
+        bc2 = @muladd ((z3 - z1) * (x - x3) + (x1 - x3) * (z - z3)) /
             ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
         if 0 <= bc2 <= 1
             bc3 = 1 - bc1 - bc2
@@ -224,11 +217,11 @@ end ### END barycentric_coordinates FUNCTION ###################################
     # Coordinates of query point
     x, z = pc.x, pc.z
 
-    bc1 = ((z2 - z3) * (x - x3) + (x3 - x2) * (z - z3)) /
-          ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
+    bc1 = @muladd ((z2 - z3) * (x - x3) + (x3 - x2) * (z - z3)) /
+        ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
 
     if 0.0 <= bc1 <= 1.0
-        bc2 = ((z3 - z1) * (x - x3) + (x1 - x3) * (z - z3)) /
+        bc2 = @muladd  ((z3 - z1) * (x - x3) + (x1 - x3) * (z - z3)) /
               ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
         if 0.0 <= bc2 <= 1.0
             bc3 = 1.0 - bc1 - bc2
@@ -236,11 +229,9 @@ end ### END barycentric_coordinates FUNCTION ###################################
         end
     end
 
-    # bary_dummy = @MVector [bc1, bc2, bc3]
-
     return intri
 
-end ### END barycentric_coordinates FUNCTION ###################################
+end 
 
 function check_corruption!(found, particle_fields)
     np = length(particle_fields.T)
@@ -274,12 +265,7 @@ function purgeparticles(particle_info, particle_weights, particle_fields, found)
             popat!(particle_fields.Fxz, i)
             popat!(particle_fields.Fzx, i)
         end
-    end
-    # particle_fields.T = [@inbounds particle_fields.T[i] for i in ikeep]    
-    # particle_fields.Fxx = [@inbounds particle_fields.Fxx[i] for i in ikeep]    
-    # particle_fields.Fzz = [@inbounds particle_fields.Fzz[i] for i in ikeep]    
-    # particle_fields.Fxz = [@inbounds particle_fields.Fxz[i] for i in ikeep]    
-    # particle_fields.Fzx = [@inbounds particle_fields.Fzx[i] for i in ikeep]    
+    end 
 
     return particle_info, particle_weights,particle_fields
 end
@@ -316,12 +302,12 @@ end
 @inline function fillweights!(particle_weights,bary_dummy,particle,vertices,IC,ipart)
     @inbounds @simd for ii = 1:6
         if ii < 4
-            # -- barycentric weights
+            # barycentric weights
             particle_weights[ipart].barycentric[ii] = bary_dummy[ii]
-            # -- Nodal weights (for particle 2 node)
+            # Nodal weights (for particle 2 node)
             particle_weights[ipart].node_weights[ii] = distance(particle,vertices[ii])
         end
-        # -- Barycentric weights (for particle 2 ip)
+        # Barycentric weights (for particle 2 ip)
         particle_weights[ipart].ip_weights[ii] = distance(particle,IC[ii])
     end
 end
@@ -449,8 +435,6 @@ function addreject(T, F, gr, θThermal, rThermal, IC, particle_info, particle_we
 
                 # Temperature
                 idx = view(e2n_p1,:,iel)
-                # Tp = mydot(bary_coords, view(T,idx))
-                # Tp = weightednode2particle(view(T, idx), bary_coords)
                 Tp = weightednode2particle(view(T, idx), fw.(bary_coords))
 
                 # -- Add to Particle Structures
@@ -493,8 +477,8 @@ end ### END add_reject FUNCTION ################################################
         p = 1-p
         q = 1-q 
     end
-    x   =  vp[1].x + (vp[2].x-vp[1].x)*p + (vp[3].x-vp[1].x)*q
-    z   =  vp[1].z + (vp[2].z-vp[1].z)*p + (vp[3].z-vp[1].z)*q
+    x  = @muladd vp[1].x + (vp[2].x-vp[1].x)*p + (vp[3].x-vp[1].x)*q
+    z  = @muladd vp[1].z + (vp[2].z-vp[1].z)*p + (vp[3].z-vp[1].z)*q
     
     Point2D{Polar}(x,z)
 end
@@ -506,7 +490,6 @@ function particles_generator(θ3, r3, IntC, e2n_p1; number_of_particles = 12)
     particle_info   = PINFO[]    
     particle_weights= PWEIGHTS[]   
     nrand           = number_of_particles
-    # bary_coords     = Vector{Float64}(undef,3)
     node_weights    = zeros(3)
     ip_weights      = similar(node_weights)
     xp = zeros(3)
@@ -518,15 +501,15 @@ function particles_generator(θ3, r3, IntC, e2n_p1; number_of_particles = 12)
         
         for _ in 1:nrand            
 
-            # GENERATE RANDOM PARTICLE -------------------
+            # generate radom particle inside triangle
             particle_polar  = randomintriangle(vertices)
-            # -- check if particle was rotated
+            # check if particle was rotated
             if check == true
                 if particle_polar.x > 2pi
                     particle_polar.x -= 2pi
                 end
             end
-            t_parent        = ceil(Int,iel/4)        
+            t_parent = ceil(Int,iel/4)        
 
             # add to Particle Structures
             push!(particle_info, PINFO(
@@ -537,18 +520,14 @@ function particles_generator(θ3, r3, IntC, e2n_p1; number_of_particles = 12)
                                        ceil(Int,iel/4),
                                        color 
                                        ) 
-                  )
+            )
 
-            # GENERATE PARTICLE WEIGHTS -------------------
-            # -- Barycentric coordinates and check if point is inside triangle
+            # Barycentric coordinates and check if point is inside triangle
             bary_coords,    = barycentric_coordinates2(true, vertices, particle_polar)
-            # -- Weights (for particle → node)
+            # Weights (for particle → node)
             node_weights   .= distance(particle_polar, vertices)
             nw              = @MVector [node_weights[1],node_weights[2],node_weights[3]]
-            # nw              = @MVector [bary_coords[1],
-            #                             bilinear_weigth(vertices, particle_polar, 1),
-            #                             bilinear_weigth(vertices, particle_polar, 2)]
-            # -- Weights (for particle → integration point)
+            #  Weights (for particle → integration point)
             ip_weights      = distance(particle_polar, IntC[t_parent,:])
             iw              = @MVector [ip_weights[1],ip_weights[2],ip_weights[3],
                                         ip_weights[4],ip_weights[5],ip_weights[6]]
@@ -583,8 +562,8 @@ end
 
 function anycustom(a,b)
     out = false
-    @inbounds for i ∈ axes(b,1)
-        if b[i] == a
+    for i ∈ axes(b,1)
+        if @inbounds b[i] == a
             out = true
             break
         end
@@ -612,7 +591,6 @@ function findlostparticles(t_lost,particle_info,θThermal, rThermal)
     end
 end
 
-        
 function check_parent(vertices,θThermal, rThermal, xp, particle, iel)
     # -- Vertices of previous parent element
     getvertices!(vertices, θThermal, rThermal, iel)
@@ -624,7 +602,6 @@ function check_parent(vertices,θThermal, rThermal, xp, particle, iel)
 end
 
 function ismember(a,b)
-    # v = fill(0,div(length(b),100))
     v = fill(0,length(b))
     n = 0
     for i in axes(b,1)
@@ -647,12 +624,10 @@ function intriangle(vc::NamedTuple, pc)
     x, z = pc.x, pc.z
 
     intri = false
-    bc1 =
-        ((z2 - z3) * (x - x3) + (x3 - x2) * (z - z3)) /
+    bc1 = @muladd ((z2 - z3) * (x - x3) + (x3 - x2) * (z - z3)) /
         ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
     if 0 <= bc1 <= 1
-        bc2 =
-            ((z3 - z1) * (x - x3) + (x1 - x3) * (z - z3)) /
+        bc2 = @muladd  ((z3 - z1) * (x - x3) + (x1 - x3) * (z - z3)) /
             ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
         if 0 <= bc2 <= 1
             bc3 = 1 - bc1 - bc2
@@ -672,12 +647,10 @@ function intriangle(vc::Vector{Point2D{T}}, pc) where {T}
     x, z = pc.x, pc.z
 
     intri = false
-    bc1 =
-        ((z2 - z3) * (x - x3) + (x3 - x2) * (z - z3)) /
+    bc1 = @muladd  ((z2 - z3) * (x - x3) + (x3 - x2) * (z - z3)) /
         ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
     if 0 <= bc1 <= 1
-        bc2 =
-            ((z3 - z1) * (x - x3) + (x1 - x3) * (z - z3)) /
+        bc2 = @muladd ((z3 - z1) * (x - x3) + (x1 - x3) * (z - z3)) /
             ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
         if 0 <= bc2 <= 1
             bc3 = 1 - bc1 - bc2
@@ -694,9 +667,9 @@ function barycentric(vc::Vector{Point2D{T}}, pc) where {T}
     x1, x2, x3 = vc[1].x, vc[2].x, vc[3].x
     z1, z2, z3 = vc[1].z, vc[2].z, vc[3].z
     
-    bc1 = ((z2 - z3) * (pc.x - x3) + (x3 - x2) * (pc.z - z3)) /
+    bc1 = @muladd   ((z2 - z3) * (pc.x - x3) + (x3 - x2) * (pc.z - z3)) /
           ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
-    bc2 = ((z3 - z1) * (pc.x - x3) + (x1 - x3) * (pc.z - z3)) /
+    bc2 = @muladd  ((z3 - z1) * (pc.x - x3) + (x1 - x3) * (pc.z - z3)) /
           ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
     bc3 = 1 - bc1 - bc2
 
@@ -708,9 +681,9 @@ function barycentric(vc::NamedTuple, pc)
     x1, x2, x3 = vc.x[1], vc.x[2], vc.x[3]
     z1, z2, z3 = vc.z[1], vc.z[2], vc.z[3]
     
-    bc1 = ((z2 - z3) * (pc.x - x3) + (x3 - x2) * (pc.z - z3)) /
+    bc1 = @muladd ((z2 - z3) * (pc.x - x3) + (x3 - x2) * (pc.z - z3)) /
           ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
-    bc2 = ((z3 - z1) * (pc.x - x3) + (x1 - x3) * (pc.z - z3)) /
+    bc2 = @muladd ((z3 - z1) * (pc.x - x3) + (x1 - x3) * (pc.z - z3)) /
           ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
     bc3 = 1 - bc1 - bc2
 
@@ -750,103 +723,103 @@ getvertices_e2np1(gr::Tsearch{T, M}, t::Int) where {T,M} =
     (x = (gr.θ3[1,t], gr.θ3[2, t], gr.θ3[3, t]),
      z = (gr.r3[1,t], gr.r3[2, t], gr.r3[3, t]))
 
-function find_parent_triangle(pc, ScratchSearch, gr)
-    # unpack
-    dθ, dr, nr = ScratchSearch.dθ, ScratchSearch.dr, ScratchSearch.nr
-    # find rectangular block
-    segθ = Int32(div(pc.x, dθ, RoundUp))
-    segr = Int32(div(pc.z - 1.22, dr, RoundUp))
-    iblock = 2*nr*(segθ-1) + 2*segr-1
-    # get lower triangle
-    # ilower_triangle = ntuple(i->gr.e2n[i,iblock], 3)
-    # lower_triangle = getvertices_e2n(gr, ilower_triangle)
-    lower_triangle = getvertices_e2n(ScratchSearch, iblock)
-    # check if belongs to lower triangle
-    found = intriangle(lower_triangle, pc)
-    # return values
-    iparent = found ? iblock : iblock+1 # id of parent triangle
-    # inner_nodes = ntuple(i->gr.e2n[i+3, iparent], 3) # nodes of central inner triangle
-    return iparent
-end
+# function find_parent_triangle(pc, ScratchSearch, gr)
+#     # unpack
+#     dθ, dr, nr = ScratchSearch.dθ, ScratchSearch.dr, ScratchSearch.nr
+#     # find rectangular block
+#     segθ = Int32(div(pc.x, dθ, RoundUp))
+#     segr = Int32(div(pc.z - 1.22, dr, RoundUp))
+#     iblock = 2*nr*(segθ-1) + 2*segr-1
+#     # get lower triangle
+#     # ilower_triangle = ntuple(i->gr.e2n[i,iblock], 3)
+#     # lower_triangle = getvertices_e2n(gr, ilower_triangle)
+#     lower_triangle = getvertices_e2n(ScratchSearch, iblock)
+#     # check if belongs to lower triangle
+#     found = intriangle(lower_triangle, pc)
+#     # return values
+#     iparent = found ? iblock : iblock+1 # id of parent triangle
+#     # inner_nodes = ntuple(i->gr.e2n[i+3, iparent], 3) # nodes of central inner triangle
+#     return iparent
+# end
 
 
-function find_child_triangle(iparent, ScratchSearch, cp)
-    idx = iparent*4
-    @inbounds if cp.x > ScratchSearch.θ3[idx[1]] #gr.θ[inner_nodes[1]]
-        return iparent+1
+# function find_child_triangle(iparent, ScratchSearch, cp)
+#     idx = iparent*4
+#     @inbounds if cp.x > ScratchSearch.θ3[idx[1]] #gr.θ[inner_nodes[1]]
+#         return iparent+1
 
-    elseif cp.z >ScratchSearch.r3[idx[3]] #gr.r[inner_nodes[3]]
-        return iparent+2
+#     elseif cp.z >ScratchSearch.r3[idx[3]] #gr.r[inner_nodes[3]]
+#         return iparent+2
 
-    else
-        # inner_triangle = getvertices_e2n(gr, inner_nodes)
-        inner_triangle = getvertices_e2np1(ScratchSearch, idx)
-        found = intriangle(inner_triangle, cp)
-        return found ? iparent+3 : iparent
-    end
-end
+#     else
+#         # inner_triangle = getvertices_e2n(gr, inner_nodes)
+#         inner_triangle = getvertices_e2np1(ScratchSearch, idx)
+#         found = intriangle(inner_triangle, cp)
+#         return found ? iparent+3 : iparent
+#     end
+# end
 
 
-function fillParticleStuff!(particle_weights, particle_info, vertices, IntC, ipart) 
-    particle_info[ipart].t_parent = ceil(Int,particle_info[ipart].t/4)        
-    # -- Calculate barycentric coordinates and check if point is inside triangle
-    bc = barycentric(vertices, particle_info[ipart].CPolar)
-    @simd for ii = 1:6
-        if ii < 4
-            # -- barycentric weights
-            particle_weights[ipart].barycentric[ii] = bc[ii]
-            # -- Nodal weights (for particle 2 node)
-            particle_weights[ipart].node_weights[ii] = distance(particle_info[ipart].CPolar, 
-                                                                (x=vertices.x[ii], z=vertices.z[ii]))
-        end
-        # -- Barycentric weights (for particle 2 ip)
-        particle_weights[ipart].ip_weights[ii] = distance(particle_info[ipart].CPolar, 
-                                                          IntC[particle_info[ipart].t_parent,ii])
-    end
+# function fillParticleStuff!(particle_weights, particle_info, vertices, IntC, ipart) 
+#     particle_info[ipart].t_parent = ceil(Int,particle_info[ipart].t/4)        
+#     # -- Calculate barycentric coordinates and check if point is inside triangle
+#     bc = barycentric(vertices, particle_info[ipart].CPolar)
+#     @simd for ii = 1:6
+#         if ii < 4
+#             # -- barycentric weights
+#             particle_weights[ipart].barycentric[ii] = bc[ii]
+#             # -- Nodal weights (for particle 2 node)
+#             particle_weights[ipart].node_weights[ii] = distance(particle_info[ipart].CPolar, 
+#                                                                 (x=vertices.x[ii], z=vertices.z[ii]))
+#         end
+#         # -- Barycentric weights (for particle 2 ip)
+#         particle_weights[ipart].ip_weights[ii] = distance(particle_info[ipart].CPolar, 
+#                                                           IntC[particle_info[ipart].t_parent,ii])
+#     end
 
-end
+# end
 
-function direct_tsearch(particle_info, particle_weights, gr, IntC, ScratchSearch, θThermal, rThermal, ipart)
-    pc = @inbounds particle_info[ipart].CPolar
-    v = getvertices(θThermal, rThermal, particle_info[ipart].t) # vertices of previous parent element
+# function direct_tsearch(particle_info, particle_weights, gr, IntC, ScratchSearch, θThermal, rThermal, ipart)
+#     pc = @inbounds particle_info[ipart].CPolar
+#     v = getvertices(θThermal, rThermal, particle_info[ipart].t) # vertices of previous parent element
     
-    # -- Calculate barycentric coordinates and check if point is inside triangle
-    found = intriangle(v, @inbounds(particle_info[ipart].CPolar))
-    if found
-        fillParticleStuff!(particle_weights, particle_info, v, IntC, ipart)
-        return particle_info
+#     # -- Calculate barycentric coordinates and check if point is inside triangle
+#     found = intriangle(v, @inbounds(particle_info[ipart].CPolar))
+#     if found
+#         fillParticleStuff!(particle_weights, particle_info, v, IntC, ipart)
+#         return particle_info
 
-    else
-        iparent = find_parent_triangle(pc, ScratchSearch, gr) # → main triangle
-        particle_info[ipart].t = find_child_triangle(iparent, ScratchSearch, pc) # → main triangle hosts 4 mini-triangles
-        fillParticleStuff!(particle_weights, particle_info, v, IntC, ipart)
-        return particle_info
-    end
+#     else
+#         iparent = find_parent_triangle(pc, ScratchSearch, gr) # → main triangle
+#         particle_info[ipart].t = find_child_triangle(iparent, ScratchSearch, pc) # → main triangle hosts 4 mini-triangles
+#         fillParticleStuff!(particle_weights, particle_info, v, IntC, ipart)
+#         return particle_info
+#     end
 
-end
+# end
 
-function tsearch(particle_info, particle_weights, gr, IntC, ScratchSearch::Tsearch{Float64, Int64}, θThermal, rThermal)
-    Threads.@threads for ipart in axes(particle_info,1)
-        direct_tsearch(particle_info, particle_weights, gr, IntC, ScratchSearch, θThermal, rThermal, ipart);
-    end
-    return particle_info, particle_weights
-end
+# function tsearch(particle_info, particle_weights, gr, IntC, ScratchSearch::Tsearch{Float64, Int64}, θThermal, rThermal)
+#     Threads.@threads for ipart in axes(particle_info,1)
+#         direct_tsearch(particle_info, particle_weights, gr, IntC, ScratchSearch, θThermal, rThermal, ipart);
+#     end
+#     return particle_info, particle_weights
+# end
 
-function tsearch_single_particle(particle_info, particle_weights, θThermal, rThermal, neighbours0, IntC, ipart)
-    vertices = [Point2D{Polar}(0.0, 0.0) for _ in 1:3] # element vertices 
+# function tsearch_single_particle(particle_info, particle_weights, θThermal, rThermal, neighbours0, IntC, ipart)
+#     vertices = [Point2D{Polar}(0.0, 0.0) for _ in 1:3] # element vertices 
     
-    # Find particles who remain within same old triangular element
-    # check if particle is in the same triangle as in previous time step i.e. found = true
-    particle_info, found = isinparent(particle_info, θThermal, rThermal, vertices, ipart)
-    if found == false
-        # check neighbour that contains new position of the particle
-        isinneighbours_single!(particle_info, θThermal, rThermal, vertices, ipart, neighbours0)
-    end
-    # fill weights information
-    particle_weights, particle_info = fillparticle(particle_weights, particle_info, vertices, IntC, θThermal, rThermal, ipart)
+#     # Find particles who remain within same old triangular element
+#     # check if particle is in the same triangle as in previous time step i.e. found = true
+#     particle_info, found = isinparent(particle_info, θThermal, rThermal, vertices, ipart)
+#     if found == false
+#         # check neighbour that contains new position of the particle
+#         isinneighbours_single!(particle_info, θThermal, rThermal, vertices, ipart, neighbours0)
+#     end
+#     # fill weights information
+#     particle_weights, particle_info = fillparticle(particle_weights, particle_info, vertices, IntC, θThermal, rThermal, ipart)
     
-    return particle_info, particle_weights
-end
+#     return particle_info, particle_weights
+# end
 
 function isinparent!(particle_info, θThermal, rThermal, vertices, found, ipart)
     nt = Threads.threadid()
@@ -856,22 +829,21 @@ function isinparent!(particle_info, θThermal, rThermal, vertices, found, ipart)
     found[ipart] = intriangle(vertices[nt], particle_info[ipart].CPolar)
 end
 
-function isinparent(particle_info, θThermal, rThermal, vertices, ipart)
-    # -- Vertices of previous parent element
-    getvertices!(vertices, θThermal, rThermal, particle_info[ipart].t)
-    # -- Calculate barycentric coordinates and check if point is inside triangle
-    found = intriangle(vertices, particle_info[ipart].CPolar)
+# function isinparent(particle_info, θThermal, rThermal, vertices, ipart)
+#     # -- Vertices of previous parent element
+#     getvertices!(vertices, θThermal, rThermal, particle_info[ipart].t)
+#     # -- Calculate barycentric coordinates and check if point is inside triangle
+#     found = intriangle(vertices, particle_info[ipart].CPolar)
 
-    return particle_info, found
-end
+#     return particle_info, found
+# end
 
 function isinneighbours!(particle_info, θThermal, rThermal, vertices, ipart, found, neighbours0) 
-    # particle = particle_info[ipart].CPolar
     nt = Threads.threadid()
     for p in neighbours0[particle_info[ipart].t]
-        # -- Vertices of previous parent element
+        # Vertices of previous parent element
         getvertices!(vertices[nt], θThermal, rThermal, p)
-        # -- Calculate barycentric coordinates and check if point is inside triangle
+        # Calculate barycentric coordinates and check if point is inside triangle
         intri = intriangle(vertices[nt], particle_info[ipart].CPolar)
         if intri == true
             particle_info[ipart].t = p
@@ -881,19 +853,19 @@ function isinneighbours!(particle_info, θThermal, rThermal, vertices, ipart, fo
     end
 end
 
-function isinneighbours_single!(particle_info, θThermal, rThermal, vertices, ipart, neighbours0) 
-    nb = neighbours0[particle_info[ipart].t]
-    for p in nb
-        # -- Vertices of previous parent element
-        getvertices!(vertices, θThermal, rThermal, p)
-        # -- Calculate barycentric coordinates and check if point is inside triangle
-        intri = intriangle(vertices, particle_info[ipart].CPolar)
-        if intri == true
-            particle_info[ipart].t = p
-            break
-        end
-    end
-end
+# function isinneighbours_single!(particle_info, θThermal, rThermal, vertices, ipart, neighbours0) 
+#     nb = neighbours0[particle_info[ipart].t]
+#     for p in nb
+#         # Vertices of previous parent element
+#         getvertices!(vertices, θThermal, rThermal, p)
+#         # Calculate barycentric coordinates and check if point is inside triangle
+#         intri = intriangle(vertices, particle_info[ipart].CPolar)
+#         if intri == true
+#             particle_info[ipart].t = p
+#             break
+#         end
+#     end
+# end
 
 function fillparticle!(particle_weights, particle_info, vertices, IntC, θThermal, rThermal, ipart)
     nt = Threads.threadid()
@@ -918,27 +890,26 @@ function fillparticle!(particle_weights, particle_info, vertices, IntC, θTherma
 
 end
 
-function fillparticle(particle_weights, particle_info, vertices, IntC, θThermal, rThermal, ipart)
-    particle_info[ipart].t_parent = ceil(Int,particle_info[ipart].t/4)  
-    # -- Check if element is crossing π and correct if needed
-    # check_crossingπ!(vertices, particle_info[ipart].CPolar)
-    getvertices!(vertices, θThermal, rThermal, particle_info[ipart].t)
-    # -- Calculate barycentric coordinates and check if point is inside triangle
-    bc = barycentric(vertices, particle_info[ipart].CPolar)
+# function fillparticle(particle_weights, particle_info, vertices, IntC, θThermal, rThermal, ipart)
+#     particle_info[ipart].t_parent = ceil(Int,particle_info[ipart].t/4)  
+#     # -- Check if element is crossing π and correct if needed
+#     getvertices!(vertices, θThermal, rThermal, particle_info[ipart].t)
+#     # -- Calculate barycentric coordinates and check if point is inside triangle
+#     bc = barycentric(vertices, particle_info[ipart].CPolar)
 
-    @simd for ii = 1:6
-        if ii < 4
-            # -- barycentric weights
-            particle_weights[ipart].barycentric[ii] = bc[ii]
-            # -- Nodal weights (for particle 2 node)
-            particle_weights[ipart].node_weights[ii] = distance(particle_info[ipart].CPolar,
-                                                                vertices[ii])
-        end
-        # -- Barycentric weights (for particle 2 ip)
-        particle_weights[ipart].ip_weights[ii] = distance(particle_info[ipart].CPolar, 
-                                                          IntC[particle_info[ipart].t_parent,ii])
-    end
+#     @simd for ii = 1:6
+#         if ii < 4
+#             # -- barycentric weights
+#             particle_weights[ipart].barycentric[ii] = bc[ii]
+#             # -- Nodal weights (for particle 2 node)
+#             particle_weights[ipart].node_weights[ii] = distance(particle_info[ipart].CPolar,
+#                                                                 vertices[ii])
+#         end
+#         # -- Barycentric weights (for particle 2 ip)
+#         particle_weights[ipart].ip_weights[ii] = distance(particle_info[ipart].CPolar, 
+#                                                           IntC[particle_info[ipart].t_parent,ii])
+#     end
 
-    return particle_weights, particle_info
-end
+#     return particle_weights, particle_info
+# end
 

@@ -14,7 +14,7 @@ function main()
     else
         path = "/home/albert/Desktop/output"
     end
-    folder = "Iso_new_fse_new_stress"
+    folder = "HarmAnisoV30Ra1e5"
     OUT, iplot = setup_output(path, folder)
 
     #=========================================================================
@@ -91,7 +91,7 @@ function main()
         INITIALISE PARTICLES
     =========================================================================#
     particle_info, particle_weights, particle_fields = particles_generator(
-        θThermal, rThermal, IntC, gr.e2n_p1, number_of_particles = 12
+        θThermal, rThermal, IntC, gr.e2n_p1, number_of_particles = 8
     )
 
     #=========================================================================
@@ -111,7 +111,7 @@ function main()
     # Initialise temperature @ particles
     init_particle_temperature!(particle_fields, particle_info, type = perturbation)
 
-    viscosity_type = :IsoviscousIsotropic
+    viscosity_type = :IsoviscousAnisotropic
     #= Options:
         (*) "IsoviscousIsotropic"
         (*) "TemperatureDependantIsotropic"
@@ -128,12 +128,12 @@ function main()
     )
 
     ρ = state_equation(VarT.α, T)
-    η = getviscosity(T, viscosity_type, η = 1/0.6899025321942348) 
+    η = getviscosity(T, viscosity_type, η = 1.81) 
     	# η = 1 for isotropic
     	# η = 1.81 for anisotropic with phi = 30%
     	# η = 1/0.6899025321942348 for anisotropic with phi = 20%
     Valη = Val(η)
-    g = 1e4
+    g = 1e5
     𝓒 = anisotropic_tensor(FSE, D, Valη)
 
     #=========================================================================
@@ -182,10 +182,8 @@ function main()
             reset_timer!(to)
 
             #= Update material properties =#
-            @timeit to "Material properties" begin
-                state_equation!(ρ, VarT.α, T)
-                getviscosity!(η, T)
-            end
+            state_equation!(ρ, VarT.α, T)
+            getviscosity!(η, T)
 
             #=
                 Stokes solver using preconditioned-CG 
@@ -215,26 +213,19 @@ function main()
 
             Δt = calculate_Δt(Ucartesian, nθ, min_inradius) # adaptive time-step
 
-            @timeit to "Stress" begin
-                #=
-                    Stress-Strain postprocessor
-                =#
-                # F, τ, ε, = stress(
-                #     Ucart, T, F, 𝓒, τ, ε, gr.e2n, θStokes, rStokes, η, PhaseID, Δt
-                # )
-                stress!(F, Ucart, gr.nel, DoF_U, coordinates, 6, SF_Stokes, Δt)
-                # shear_heating = shearheating(τ, ε)
-            end
-
-            @timeit to "Finite Strain Ellipsoid" begin
-                # isotropic_lithosphere!(F, isotropic_idx)
-                FSE = getFSE(F, FSE)
-            end
+            #=
+                Stress-Strain postprocessor
+            =#
+            # F, τ, ε, = stress(
+            #     Ucart, T, F, 𝓒, τ, ε, gr.e2n, θStokes, rStokes, η, PhaseID, Δt
+            # )
+            stress!(F, Ucart, gr.nel, DoF_U, coordinates, 6, SF_Stokes, Δt)
+            
+            # isotropic_lithosphere!(F, isotropic_idx)
+            FSE = getFSE(F, FSE)
 
             #= Compute the viscous tensor =#
-            @timeit to "Get and rotate viscous tensor" begin
-                𝓒 = anisotropic_tensor(FSE, D, Valη)
-            end
+            𝓒 = anisotropic_tensor(FSE, D, Valη)
 
             #=
                 Diffusion solver
@@ -292,7 +283,6 @@ function main()
                         nr,
                         Δt,
                         ΔT,
-                        to
                     )
                 end
 
@@ -362,6 +352,7 @@ function main()
                     particle_info,
                     particle_weights,
                     particle_fields,
+                    min_num_particles = 3
                 )
             end
 

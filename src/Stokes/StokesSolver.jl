@@ -8,24 +8,26 @@ function solveStokes(U, P, gr, Ucartesian,Upolar, g, ρ, η, 𝓒,
     coordinates, RotationMatrices,
     PhaseID, UBC,
     KKidx,GGidx,MMidx,
-    to)
+    to;
+    solver = :pardiso)
 
     ∂Ωu = UBC.Ω
     ufix = UBC.vfix
     ifree = UBC.ifree
     
     @timeit to "Stokes" begin
-        @timeit to "Assembly" KK,GG,MM,Rhs =
+        KK,GG,MM,Rhs =
            assembly_stokes_cylindric(gr, coordinates, g, ρ, η, 𝓒, PhaseID, KKidx, GGidx, MMidx)
 
-        @timeit to "BCs" begin
-            KK,GG,Rhs = _prepare_matrices(KK, GG, Rhs, RotationMatrices)
+        KK,GG,Rhs = _prepare_matrices(KK, GG, Rhs, RotationMatrices)
             U,Rhs = _apply_bcs(U,KK,Rhs,∂Ωu,ufix)
-        end
 
-        @timeit to "PCG solver" U, P = StokesPcCG(U, P, KK, MM, GG, Rhs, ifree)
-
-        @timeit to "Remove net rotation" U, Ucart, Upolar, Ucartesian = 
+        if solver == :pardiso    
+            @timeit to "PCG solver" U, P = StokesPcCG_pardiso(U, P, KK, MM, GG, Rhs, ifree)
+        elseif solver == :suitesparse    
+            @timeit to "PCG solver" U, P = StokesPcCG(U, P, KK, MM, GG, Rhs, ifree)
+        end    
+        U, Ucart, Upolar, Ucartesian = 
             updatevelocity2(U, Ucartesian, Upolar, ρ, RotationMatrices.TT, coordinates, gr)
     end
 

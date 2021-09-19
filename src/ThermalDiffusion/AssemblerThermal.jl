@@ -30,7 +30,7 @@ function solveDiffusion_threaded(
         fill!(FT, 0.0)
 
         # Element assembly
-        @timeit to "Assembly" assembly_threaded!(
+        assembly_threaded!(
             color_list,
             CMidx,
             KT,
@@ -47,14 +47,12 @@ function solveDiffusion_threaded(
         )
 
         # Apply Boundary conditions
-        @timeit to "BCs" begin
-            _prepare_matrices!(MT, FT, KT, T, Δt)
-            _apply_bcs!(T, MT, FT, ∂Ωt, tfix)
-        end
+        _prepare_matrices!(MT, FT, KT, T, Δt)
+        _apply_bcs!(T, MT, FT, ∂Ωt, tfix)
 
         # Solve temperature
         # if cuda == :off
-            @timeit to "Solve" T[tfree] .= MT[tfree, tfree] \ FT[tfree]
+         T[tfree] .= MT[tfree, tfree] \ FT[tfree]
         
         # else
         #     @timeit to "Solve" sol, = Krylov.cg(
@@ -64,6 +62,7 @@ function solveDiffusion_threaded(
         #     @timeit to "Fill T" @tturbo T[tfree] .=  Array(sol)
         
         # end
+        # @timeit to "pardiso" _MKLpardiso!(T, MT, FT,tfree)
 
         # Temperature increment
         ΔT = @tturbo T .- T0

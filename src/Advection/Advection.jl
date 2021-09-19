@@ -41,8 +41,8 @@ end
 function advection_RK2!(Particles, xp0, zp0, Uxp1, Uzp1, Uxp2, Uzp2, Δt)
     cte = Δt/2
     Threads.@threads for i in eachindex(Particles)
-        @inbounds Particles[i].CCart.x = xp0[i] + (Uxp1[i] + Uxp2[i])*cte
-        @inbounds Particles[i].CCart.z = zp0[i] + (Uzp1[i] + Uzp2[i])*cte
+        @inbounds Particles[i].CCart.x = @muladd xp0[i] + (Uxp1[i] + Uxp2[i])*cte
+        @inbounds Particles[i].CCart.z = @muladd zp0[i] + (Uzp1[i] + Uzp2[i])*cte
 
         @inbounds Particles[i].CPolar.x = atan(Particles[i].CCart.x, Particles[i].CCart.z)
         @inbounds Particles[i].CPolar.z = sqrt(Particles[i].CCart.x^2 + Particles[i].CCart.z^2) 
@@ -247,12 +247,13 @@ function particlesadvection(xp0, zp0, Particles, Δt; multiplier=1)
     np = length(Particles)
     xp = Vector{Float64}(undef, np)
     zp = similar(xp)
-
+    Δtmultiplier = Δt * multiplier
     @fastmath Threads.@threads for i in eachindex(Particles)
-        @inbounds Particles[i].CCart.x = xp[i] = xp0[i] + Particles[i].UCart.x * Δt * multiplier
-        @inbounds Particles[i].CCart.z = zp[i] = zp0[i] + Particles[i].UCart.z * Δt * multiplier
+        @inbounds Particles[i].CCart.x = xp[i] = @muladd xp0[i] + Particles[i].UCart.x * Δtmultiplier
+        @inbounds Particles[i].CCart.z = zp[i] = @muladd zp0[i] + Particles[i].UCart.z * Δtmultiplier
         @inbounds Particles[i].CPolar.x = atan(Particles[i].CCart.x, Particles[i].CCart.z)
-        @inbounds Particles[i].CPolar.z = sqrt(Particles[i].CCart.x^2 + Particles[i].CCart.z^2) 
+        @inbounds Particles[i].CPolar.z =
+            @muladd √(Particles[i].CCart.x*Particles[i].CCart.x + Particles[i].CCart.z*Particles[i].CCart.z) 
         
         # Fix θ
         @inbounds if Particles[i].CPolar.x < 0
