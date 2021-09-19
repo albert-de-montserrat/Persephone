@@ -102,7 +102,13 @@ function StokesPcCG(U,P,KK,MM,GG,Rhs,ifree)
     Rhs += spmv(GG, P)
 
     # guess of the velocity field 
+<<<<<<< HEAD
     U,F = _CholeskyFactorizationSolve(U, KK, Rhs, ifree) # return factorization F to speed up next direct solvers
+=======
+#     U,F = _CholeskyFactorizationSolve(U, KK, Rhs, ifree) # return factorization F to speed up next direct solvers
+    ps, A_pardiso = _MKLfactorize(KK, Rhs, ifree)
+    _MKLsolve!(U, A_pardiso, ps, Rhs, ifree)
+>>>>>>> 1c94806b6f4a2b57207dc17b64bb5fe9f8ca1299
 
     # initial pressure residual vector
     GGtransp = sparse(GG')
@@ -135,9 +141,14 @@ function StokesPcCG(U,P,KK,MM,GG,Rhs,ifree)
         =============================================================#
         # (1) y   = G*q
         y = spmv(GG, q)
+<<<<<<< HEAD
         # (2) Solve K z = y
         _CholeskyWithFactorization!(z, F, y, ifree)
         # (3) Sq  = G'*z
+=======
+#         _CholeskyWithFactorization!(z, F, y, ifree)
+        _MKLsolve!(z, A_pardiso, ps, y, ifree)       
+>>>>>>> 1c94806b6f4a2b57207dc17b64bb5fe9f8ca1299
         Sq = GGtransp*z
         #=============================================================#
         qSq = mydot(q,Sq) # denominator to calculate alpha

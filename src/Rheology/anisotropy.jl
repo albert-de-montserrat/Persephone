@@ -211,12 +211,12 @@ function get_tensor_and_rotate!(nu_11, nu_33, nu_55, nu_13, nu_15, nu_35,
        
     im = D.sblk*(r₁_imin-1) + r₂_imin
     # Allocate stiffness tensor
-    C = @SMatrix [D.𝓒[im, 1]  D.𝓒[im, 7]  D.𝓒[im, 8]    0          0           0
-                  D.𝓒[im, 7]  D.𝓒[im, 2]  D.𝓒[im, 9]    0          0           0
-                  D.𝓒[im, 8]  D.𝓒[im, 9]  D.𝓒[im, 3]    0          0           0
-                  0           0           0             max(D.𝓒[im, 4],D.w) 0           0 
-                  0           0           0             0          max(D.𝓒[im, 5],D.w)  0
-                  0           0           0             0          0           D.𝓒[im, 6]]
+    C = @SMatrix [D.𝓒[im, 1]  D.𝓒[im, 7]  D.𝓒[im, 8]    0                    0                      0
+                  D.𝓒[im, 7]  D.𝓒[im, 2]  D.𝓒[im, 9]    0                    0                      0
+                  D.𝓒[im, 8]  D.𝓒[im, 9]  D.𝓒[im, 3]    0                    0                      0
+                  0           0           0             max(D.𝓒[im, 4],D.w)  0                      0 
+                  0           0           0             0                    max(D.𝓒[im, 5],D.w)    0
+                  0           0           0             0                    0                      max(D.𝓒[im, 6],D.w)]
 
     # Rotation matrix
     R = rotmatrix(FSEᵢ.x1, FSEᵢ.y1)
@@ -308,8 +308,7 @@ function anisotropic_tensor_blks(FSE::Array{FiniteStrainEllipsoid{Float64},2}, D
 
     return StiffnessTensor(nu_11, nu_33, nu_55, nu_13, nu_15, nu_35)
 
-end ### END rotate_tensor FUNCTION #############################################
-
+end
 
 function get_tensor_and_rotate_blk!(nu_11, nu_33, nu_55, nu_13, nu_15, nu_35,
     FSE,R1,R2,D,iblk)

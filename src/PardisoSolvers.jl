@@ -13,7 +13,11 @@ function _MKLfactorize(KK:: SparseMatrixCSC,Rhs::Vector,ifree::Vector; verbose =
     set_matrixtype!(ps, Pardiso.REAL_SYM_POSDEF)
     # Initialize the default settings with the current matrix type
     pardisoinit(ps)
+<<<<<<< HEAD
     set_nprocs!(ps, Threads.nthreads())
+=======
+    set_nprocs!(ps, Threads.nthreads()) 
+>>>>>>> 1c94806b6f4a2b57207dc17b64bb5fe9f8ca1299
 
     fix_iparm!(ps, :T)
     # Get the correct matrix to be sent into the pardiso function.
