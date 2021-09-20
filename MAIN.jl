@@ -60,8 +60,8 @@ function main()
     #=========================================================================
         GET DEM STRUCTURE:    
     =========================================================================#
-    dem_file = joinpath("DEM", "DEM_1e-3_vol20_new3.h5")
-    dem_file = joinpath("newDEM", "Dem_1e-3_vol30.h5")
+    dem_file = joinpath("DEM", "DEM_1e-3_vol30.h5")
+    # dem_file = joinpath("newDEM", "Dem_1e-3_vol30.h5")
     Δη, ϕ = 1e-3, 0.3
     D = getDEM(dem_file, Δη, ϕ)
 
@@ -186,7 +186,7 @@ function main()
             getviscosity!(η, T)
 
             #=
-                Stokes solver using preconditioned-CG 
+                Stokes solver using preconditioned-CG
             =#       
             Ucartesian, Upolar, U, Ucart, P, to = solveStokes(
                 U,
@@ -217,12 +217,10 @@ function main()
             #=
                 Stress-Strain postprocessor
             =#
-            # F, τ, ε, = stress(
-            #     Ucart, T, F, 𝓒, τ, ε, gr.e2n, θStokes, rStokes, η, PhaseID, Δt
-            # )
             stress!(F, Ucart, gr.nel, DoF_U, coordinates, 6, SF_Stokes, Δt)
             
             # isotropic_lithosphere!(F, isotropic_idx)
+            healing!(F, FSE)
             FSE = getFSE(F, FSE)
 
             #= Compute the viscous tensor =#
@@ -258,13 +256,6 @@ function main()
                     T   : node |-> particle
                     Ui  : node |-> particle + advection
                 =#
-
-                # @timeit to "F → particle"  particle_fields = 
-                #        Fij2particle(particle_fields,
-                #                     particle_info,
-                #                     particle_weights,
-                #                     gr,
-                #                     F)
 
                 @timeit to "F → particle" particle_fields = F2particle(
                     particle_fields, particle_info, ipx, ipz, F

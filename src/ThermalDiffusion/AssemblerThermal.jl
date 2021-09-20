@@ -52,7 +52,8 @@ function solveDiffusion_threaded(
 
         # Solve temperature
         # if cuda == :off
-         T[tfree] .= MT[tfree, tfree] \ FT[tfree]
+        # T[tfree] .= MT[tfree, tfree] \ FT[tfree]
+        T[tfree], = Krylov.gmres(MT[tfree, tfree], FT[tfree])
         
         # else
         #     @timeit to "Solve" sol, = Krylov.cg(

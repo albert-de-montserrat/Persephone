@@ -117,6 +117,12 @@ version = "1.18.6"
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
 
+[[deps.DataStructures]]
+deps = ["Compat", "InteractiveUtils", "OrderedCollections"]
+git-tree-sha1 = "7d9d316f04214f7efdbb6398d545446e246eff02"
+uuid = "864edb3b-99cc-5e75-8d2d-829cb0a9cfe8"
+version = "0.18.10"
+
 [[deps.Dates]]
 deps = ["Printf"]
 uuid = "ade2ca70-3891-5945-98fb-dc099432e06a"
@@ -150,6 +156,12 @@ repo-rev = "main"
 repo-url = "https://github.com/albert-de-montserrat/Fabrics.jl.git"
 uuid = "7b55d2ff-9405-43bd-b177-8809a5e3dbfc"
 version = "0.1.0"
+
+[[deps.FileIO]]
+deps = ["Pkg", "Requires", "UUIDs"]
+git-tree-sha1 = "3c041d2ac0a52a12a27af2782b34900d9c3ee68c"
+uuid = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+version = "1.11.1"
 
 [[deps.FileWatching]]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
@@ -243,6 +255,12 @@ deps = ["LinearAlgebra", "Printf", "Random", "RecipesBase", "SparseArrays"]
 git-tree-sha1 = "1a8c6237e78b714e901e406c096fc8a65528af7d"
 uuid = "42fd0dbc-a981-5370-80f2-aaf504508153"
 version = "0.9.1"
+
+[[deps.JLD2]]
+deps = ["DataStructures", "FileIO", "MacroTools", "Mmap", "Pkg", "Printf", "Reexport", "TranscodingStreams", "UUIDs"]
+git-tree-sha1 = "192934b3e2a94e897ce177423fd6cf7bdf464bce"
+uuid = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+version = "0.4.14"
 
 [[deps.JLLWrappers]]
 deps = ["Preferences"]
@@ -351,6 +369,12 @@ deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl",
 git-tree-sha1 = "5455aef09b40e5020e1520f551fa3135040d4ed0"
 uuid = "856f044c-d86e-5d09-b602-aeab76dc8ba7"
 version = "2021.1.1+2"
+
+[[deps.MacroTools]]
+deps = ["Markdown", "Random"]
+git-tree-sha1 = "5a5bc6bf062f0f95e62d0fe0a2d99699fed82dd9"
+uuid = "1914dd2f-81c6-5fcd-8719-6d5c9610ff09"
+version = "0.5.8"
 
 [[deps.ManualMemory]]
 git-tree-sha1 = "9cb207b18148b2199db259adfa923b45593fe08e"
@@ -599,6 +623,12 @@ deps = ["ExprTools", "Printf"]
 git-tree-sha1 = "209a8326c4f955e2442c07b56029e88bb48299c7"
 uuid = "a759f4b9-e2f1-59dc-863e-4aeb61b1ea8f"
 version = "0.5.12"
+
+[[deps.TranscodingStreams]]
+deps = ["Random", "Test"]
+git-tree-sha1 = "216b95ea110b5972db65aa90f88d8d89dcb8851c"
+uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
+version = "0.9.6"
 
 [[deps.URIs]]
 git-tree-sha1 = "97bbe755a53fe859669cd907f2d96aee8d2c1355"

@@ -13,6 +13,7 @@ using Polyester
 using Pardiso
 using Fabrics
 using MuladdMacro
+using Krylov
 
 import Statistics: mean
 
@@ -53,6 +54,8 @@ export rotation_matrix
 export assembly_stokes_cylindric
 
 include("ThermalDiffusion/ThermalSolver.jl")
+export _prepare_matrices!
+export _apply_bcs!
 
 include("Algebra/Quadrature.jl")
 export ScratchThermalGlobal
@@ -66,6 +69,7 @@ export volume_integral
 export getFSE
 export rebuild_FSE
 export isotropic_lithosphere!
+export healing!
 
 include("IterativeSolvers.jl")
 
@@ -153,6 +157,7 @@ export advection!
 include("ThermalDiffusion/AssemblerThermal.jl")
 export solveDiffusion_threaded
 export diffusion_immutables
+export assembly_threaded!
 
 include("Stokes/AssemblerStokes.jl")
 export solve_stokes_threaded

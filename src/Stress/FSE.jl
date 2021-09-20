@@ -16,6 +16,15 @@ function isotropic_lithosphere!(F,idx)
     end
 end
 
+function healing!(F, FSE)
+    Is = @SMatrix [1.0 0.0; 0.0 1.0]
+    Threads.@threads for i in eachindex(F)
+        if FSE[i].a1./FSE[i].a2 > 1e3
+            @inbounds F[i] = Is
+        end
+    end
+end
+
 function getFSE(F, FSE)
     @batch for iel in eachindex(F)
         local_FSE!(FSE, F, iel)
