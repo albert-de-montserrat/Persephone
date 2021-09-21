@@ -18,10 +18,9 @@ end
 
 function healing!(F, FSE)
     Is = @SMatrix [1.0 0.0; 0.0 1.0]
-    Threads.@threads for i in eachindex(F)
+    Threads.@threads for i in axes(F, 2)
         @inbounds if FSE[i].a1./FSE[i].a2 > 1e2
-            @show F[i] = Is
-            @show i
+            F[i] = Is
         end
     end
 end
