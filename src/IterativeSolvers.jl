@@ -127,20 +127,17 @@ function StokesPcCG(U,P,KK,MM,GG,Rhs,ifree)
         
         #= Perform the S times q multiplication ======================    
             S cannot be calculated explicitly, since Kinv cannot be formed
-            Sq = S * q = (G' * Kinv * G) * q
+            Sq = S * q = (Gᵀ * Kinv * G) * q
             Hence, the muliplicatipon is done in 3 steps:
             (1) y   = G*q
             (2) K z = y
-            (3) Sq  = G'*z
+            (3) Sq  = Gᵀ*z
         =============================================================#
-        # (1) y   = G*q
-        y = spmv(GG, q)
-        # (2) Solve K z = y
-        _CholeskyWithFactorization!(z, F, y, ifree)
-        # (3) Sq  = G'*z
-        Sq = GGtransp*z
+        y = spmv(GG, q) # (1) y   = G*q
+        _CholeskyWithFactorization!(z, F, y, ifree) # (2) Solve K z = y
+        Sq = GGtransp*z # (3) Sq  = G'*z
         #=============================================================#
-        qSq = mydot(q,Sq) # denominator to calculate alpha
+        qSq = mydot(q, Sq) # denominator to calculate alpha
         copyto!(rlast, r) # needed for Polak-Ribiere version 1
         α = rd/qSq # steps size in direction q
         
@@ -158,7 +155,7 @@ function StokesPcCG(U,P,KK,MM,GG,Rhs,ifree)
 
         d  = _precondition(pc, r) # precondition residual
         # Make new search direction q S-orthogonal to all previous q's
-        β  = mydot(r-rlast,d)/rd # Polak-Ribiere version 1        
+        β  = mydot(r-rlast, d)/rd # Polak-Ribiere version 1        
         xpy!(q, d, β)
         
     end

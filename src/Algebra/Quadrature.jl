@@ -23,6 +23,14 @@ struct ShapeFunctionsStokes{T}
     N3::Vector{SMatrix{1,3,T,3}}
 end
 
+struct ShapeFunctionsStress{A,B,C,D,E,F}
+    N::A
+    ∇N::B
+    NP::C
+    dN3ds::D
+    w_ip::E
+    N3::F
+end
 
 @inline function _get_SF(nip, nnodel)
     x_ip, w_ip = ip_triangle(nip)

@@ -162,6 +162,7 @@ export assembly_threaded!
 include("Stokes/AssemblerStokes.jl")
 export solve_stokes_threaded
 export stokes_immutables
+export stress_shape_functions
 
 include("Setup/boundary_conditions.jl")
 export BC

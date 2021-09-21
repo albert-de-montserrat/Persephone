@@ -67,10 +67,12 @@ end
 # out-of-place Sparse CSC matrix times dense vector
 function spmv(A::AbstractSparseMatrix, x::DenseVector)
     out = zeros(eltype(x), A.m)
-    for col in 1:A.n
-        xi = x[col]
-        @tturbo for i in nzrange(A, col)
-            out[A.rowval[i]] += A.nzval[i]*xi
+    Aj = rowvals(A)
+    nzA = nonzeros(A)
+    @inbounds for col in 1:A.n
+        xj = x[col]
+        @fastmath for j in nzrange(A, col)
+            out[Aj[j]] += nzA[j]*xj
         end
     end
     out
@@ -79,12 +81,15 @@ end
 # in-of-place Sparse CSC matrix times dense vector
 function spmv!(A::AbstractSparseMatrix, x::DenseVector, out::DenseVector)
     fill!(out, zero(eltype(out)))
-    for col in 1:A.n            
-        xi = x[col]
-        @tturbo for i in nzrange(A, col)
-            out[A.rowval[i]] += A.nzval[i]*xi
+    Aj = rowvals(A)
+    nzA = nonzeros(A)
+    @inbounds for col in 1:A.n
+        xj = x[col]
+        @fastmath for j in nzrange(A, col)
+            out[Aj[j]] += nzA[j]*xj
         end
     end
+    out
 end
 
 mynorm(r::Vector) = sqrt(mydot(r,r))

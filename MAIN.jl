@@ -14,7 +14,7 @@ function main()
     else
         path = "/home/albert/Desktop/output"
     end
-    folder = "HarmAnisoV30Ra1e5"
+    folder = "Bench1e4_eigencheck"
     OUT, iplot = setup_output(path, folder)
 
     #=========================================================================
@@ -29,8 +29,8 @@ function main()
     else
         nr = Int(1+2^N)
         nθ = Int(12*2^N)
-        nr = Int(1 + 32)
-        nθ = Int(256)
+        # nr = Int(1 + 32)
+        # nθ = Int(256)
         gr = Grid(nθ, nr)
     end
     IDs = point_ids(gr)
@@ -111,7 +111,7 @@ function main()
     # Initialise temperature @ particles
     init_particle_temperature!(particle_fields, particle_info, type = perturbation)
 
-    viscosity_type = :IsoviscousAnisotropic
+    viscosity_type = :IsoviscousIsotropic
     #= Options:
         (*) "IsoviscousIsotropic"
         (*) "TemperatureDependantIsotropic"
@@ -152,6 +152,8 @@ function main()
         gr, nnod, 2, 3, 6, gr.nel, 7
     )
 
+    SF_Stress = stress_shape_functions()
+
     # Diffusion_immutables
     KT, MT, FT, DoF_T, valA, SF_Diffusion, ScratchDifussion = diffusion_immutables(
         gr, 2, 3, 6, 7
@@ -177,7 +179,7 @@ function main()
     Time = 0.0
     T0 = deepcopy(T)
 
-    for iplot in 1:50
+    for iplot in 1:150
         for _ in 1:50
             reset_timer!(to)
 
@@ -217,10 +219,14 @@ function main()
             #=
                 Stress-Strain postprocessor
             =#
-            stress!(F, Ucart, gr.nel, DoF_U, coordinates, 6, SF_Stokes, Δt)
+            # F, τ, ε, τII, εII = stress(
+            #     Ucart, T, F, 𝓒, τ, ε, gr.e2n, θStokes, rStokes, η, PhaseID, Δt
+            # )
+            stress!(F, Ucart, gr.nel, DoF_U, coordinates, SF_Stress, Δt)
+            @benchmark stress!($F,$ Ucart, $gr.nel, $DoF_U, $coordinates, $SF_Stress, $Δt)
             
             # isotropic_lithosphere!(F, isotropic_idx)
-            healing!(F, FSE)
+            # healing!(F, FSE)
             FSE = getFSE(F, FSE)
 
             #= Compute the viscous tensor =#
