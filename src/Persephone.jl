@@ -67,6 +67,7 @@ include("Stress/FSE.jl")
 export FiniteStrainEllipsoid
 export volume_integral
 export getFSE
+export getFSE_healing
 export rebuild_FSE
 export isotropic_lithosphere!
 export healing!

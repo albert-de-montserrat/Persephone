@@ -78,6 +78,12 @@ function spmv(A::AbstractSparseMatrix, x::DenseVector)
     out
 end
 
+function _spmvt!(out, A, Aj, xj, nzA, col)
+    @fastmath for j in nzrange(A, col)
+        out[Aj[j]] += nzA[j]*xj
+    end
+end
+
 # in-of-place Sparse CSC matrix times dense vector
 function spmv!(A::AbstractSparseMatrix, x::DenseVector, out::DenseVector)
     fill!(out, zero(eltype(out)))
