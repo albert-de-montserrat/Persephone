@@ -16,26 +16,35 @@ function isotropic_lithosphere!(F,idx)
     end
 end
 
-function healing!(F, FSE)
+function healing(F, FSE)
     Is = @SMatrix [1.0 0.0; 0.0 1.0]
-    Threads.@threads for i in axes(F, 2)
+    Threads.@threads for i in CartesianIndices(F)
         @inbounds if FSE[i].a1./FSE[i].a2 > 1e2
             F[i] = Is
         end
     end
+    return F
+    # Threads.@threads for i in axes(F, 1)
+    #     @inbounds if mean([f.a1./f.a2 for f in FSE]) > 1e2
+    #         for j in axes(F,2)
+    #             F[i,j] = Is
+    #         end
+    #     end
+    # end
 end
 
 function getFSE(F, FSE)
-    @batch for iel in eachindex(F)
+    @batch for iel in CartesianIndices(F)
         _FSE!(FSE, F, iel)
     end
-    FSE
+    FSE, F
 end 
 
 function _FSE!(FSE, F, iel)
     
     # Compute FSE
-    eigval, evect = eigen(F[iel] * F[iel]')
+    Fi = F[iel]
+    eigval, evect = eigen(Fi * Fi')
     if eigval[2] > eigval[1]
         imax, imin = 2, 1
     else
@@ -43,7 +52,7 @@ function _FSE!(FSE, F, iel)
     end
 
     # Fill FSE
-    @inbounds FSE[iel] = FiniteStrainEllipsoid(
+    FSE[iel] = FiniteStrainEllipsoid(
         evect[1,imax]::Float64, # vx1
         evect[1,imin]::Float64, # vx2
         evect[2,imax]::Float64, # vy1
@@ -63,28 +72,41 @@ end
 
 function healing_FSE!(FSE, F, iel)
     
-    @inbounds if FSE[iel].a1./FSE[iel].a2 > 1e3
-        @show F[iel] = @SMatrix [1.0 0.0; 0.0 1.0]
-        @show iel
-    end
-
     # Compute FSE
-    eigval, evect = eigen(F[iel] * F[iel]')
+    Fi = F[iel]
+    eigval, evect = eigen(Fi * Fi')
     if eigval[2] > eigval[1]
         imax, imin = 2, 1
     else
         imax, imin = 1, 2
     end
 
-    # Fill FSE
-    @inbounds FSE[iel] = FiniteStrainEllipsoid(
-        evect[1,imax]::Float64, # vx1
-        evect[1,imin]::Float64, # vx2
-        evect[2,imax]::Float64, # vy1
-        evect[2,imin]::Float64, # vy2
-        √(abs(eigval[imax]))::Float64, # a1 
-        √(abs(eigval[imin]))::Float64, # a2
-    )
+    a1 = √(abs(eigval[imax]))
+    a2 = √(abs(eigval[imin]))
+    @inbounds if a1/a2 < 1e2
+        # Fill FSE
+        FSE[iel] = FiniteStrainEllipsoid(
+            evect[1,imax]::Float64, # vx1
+            evect[1,imin]::Float64, # vx2
+            evect[2,imax]::Float64, # vy1
+            evect[2,imin]::Float64, # vy2
+            a1, # a1 
+            a2, # a2
+        )
+
+    else
+        F[iel] = @SMatrix [1.0 0.0; 0.0 1.0]
+        # Fill FSE
+        FSE[iel] = FiniteStrainEllipsoid(
+            1.0, # vx1
+            0.0, # vx2
+            0.0, # vy1
+            1.0, # vy2
+            1.0, # a1 
+            1.0, # a2
+        )
+
+    end
 
 end
 

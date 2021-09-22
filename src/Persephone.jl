@@ -70,7 +70,7 @@ export getFSE
 export getFSE_healing
 export rebuild_FSE
 export isotropic_lithosphere!
-export healing!
+export healing
 
 include("IterativeSolvers.jl")
 
