@@ -63,14 +63,14 @@ function _FSE!(FSE, F, iel)
 
 end
 
-function getFSE_healing(F, FSE)
+function getFSE_healing(F, FSE; ϵ = 1e2)
     @batch for iel in eachindex(F)
-        healing_FSE!(FSE, F, iel)
+        healing_FSE!(FSE, F, iel, ϵ)
     end
     FSE, F
 end 
 
-function healing_FSE!(FSE, F, iel)
+function healing_FSE!(FSE, F, iel, ϵ)
     
     # Compute FSE
     Fi = F[iel]
@@ -83,7 +83,7 @@ function healing_FSE!(FSE, F, iel)
 
     a1 = √(abs(eigval[imax]))
     a2 = √(abs(eigval[imin]))
-    @inbounds if a1/a2 < 1e2
+    @inbounds if a1/a2 < ϵ
         # Fill FSE
         FSE[iel] = FiniteStrainEllipsoid(
             evect[1,imax]::Float64, # vx1
