@@ -37,7 +37,7 @@ function getFSE(F, FSE)
     @batch for iel in CartesianIndices(F)
         _FSE!(FSE, F, iel)
     end
-    FSE, F
+    FSE
 end 
 
 function _FSE!(FSE, F, iel)
