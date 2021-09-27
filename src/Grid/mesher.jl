@@ -231,6 +231,21 @@ function inradius(gr::Grid)
     minimum(r)
 end
 
+function inrectangle(gr::Grid)
+    # https://en.wikibooks.org/wiki/Trigonometry/Circles_and_Triangles/The_Incircle
+    x, z, nel, e2n = gr.x, gr.z, gr.nel, gr.e2n_p1
+    r = Vector{Float64}(undef,nel)
+    @inbounds @fastmath for iel in 1:nel
+        xv = ntuple(i->x[e2n[i,iel]], 3) # verteices x-coords
+        zv = ntuple(i->z[e2n[i,iel]], 3) # verteices z-coords
+        xmin, xmax = extrema(xv)
+        zmin, zmax = extrema(zv)
+        r[iel] = √( (xmin-xmax)^2 + (zmin-zmax)^2) /2 # inradius
+    end
+
+    minimum(r)
+end
+
 function sixth_node(EL2NOD, θ, r)
     nel = size(EL2NOD, 2)
     nnod = maximum(EL2NOD)

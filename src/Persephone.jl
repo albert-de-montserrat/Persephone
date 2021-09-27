@@ -24,6 +24,7 @@ export Grid_split1
 export Grid
 export point_ids
 export inradius
+export inrectangle
 export cartesian2polar
 export polar2cartesian
 export Cartesian

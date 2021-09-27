@@ -14,7 +14,7 @@ function main()
     else
         path = "/home/albert/Desktop/output"
     end
-    folder = "Bench1e4_eigencheck"
+    folder = "Healing1e6_Tdep_iso"
     OUT, iplot = setup_output(path, folder)
 
     #=========================================================================
@@ -29,15 +29,16 @@ function main()
     else
         nr = Int(1+2^N)
         nθ = Int(12*2^N)
-        # nr = Int(1 + 32)
-        # nθ = Int(256)
+        nr = Int(1 + 32)
+        nθ = Int(256)
         gr = Grid(nθ, nr)
     end
     IDs = point_ids(gr)
     load = false
 
     PhaseID = 1
-    min_inradius = inradius(gr)
+    # min_inradius = inradius(gr)
+    min_inradius = inrectangle(gr)
 
     nU = maximum(gr.e2n)
     nnod = length(gr.θ)
@@ -105,13 +106,13 @@ function main()
     # Allocate nodal velocities
     Ucartesian, Upolar = initvelocity(gr.nnod)
     # Initialise temperature @ nodes
-    perturbation = :harmonic
+    perturbation = :random
     T = init_temperature(gr, IDs, type = perturbation)
     ΔT = similar(T)
     # Initialise temperature @ particles
     init_particle_temperature!(particle_fields, particle_info, type = perturbation)
 
-    viscosity_type = :IsoviscousIsotropic
+    viscosity_type = :TemperatureDependantAnisotropic
     #= Options:
         (*) "IsoviscousIsotropic"
         (*) "TemperatureDependantIsotropic"
@@ -133,7 +134,7 @@ function main()
     	# η = 1.81 for anisotropic with phi = 30%
     	# η = 1/0.6899025321942348 for anisotropic with phi = 20%
     Valη = Val(η)
-    g = 1e5
+    g = 1e6
     𝓒 = anisotropic_tensor(FSE, D, Valη)
 
     #=========================================================================
@@ -179,8 +180,8 @@ function main()
     Time = 0.0
     T0 = deepcopy(T)
 
-    for iplot in 1:150
-        for _ in 1:50
+    for iplot in 1:500
+        for _ in 1:100
             reset_timer!(to)
 
             #= Update material properties =#
@@ -189,7 +190,8 @@ function main()
 
             #=
                 Stokes solver using preconditioned-CG
-            =#       
+            =#    
+            reset_timer!(to)
             Ucartesian, Upolar, U, Ucart, P, to = solveStokes(
                 U,
                 P,
@@ -208,8 +210,9 @@ function main()
                 GGidx,
                 MMidx,
                 to,
-                solver = :suitesparse
+                solver = :pardiso
             );
+            to
 
             println("min:max Uθ", extrema(@views U[1:2:end]))
             println("mean speed  ", mean(@views @. (√(U[1:2:end]^2 + U[2:2:end]^2))))
@@ -222,15 +225,15 @@ function main()
             # F, τ, ε, τII, εII = stress(
             #     Ucart, T, F, 𝓒, τ, ε, gr.e2n, θStokes, rStokes, η, PhaseID, Δt
             # )
-            stress!(F, Ucart, gr.nel, DoF_U, coordinates, SF_Stress, Δt)
-            @benchmark stress!($F,$ Ucart, $gr.nel, $DoF_U, $coordinates, $SF_Stress, $Δt)
+            @timeit to "F" stress!(F, Ucart, gr.nel, DoF_U, coordinates, SF_Stress, Δt)
             
             # isotropic_lithosphere!(F, isotropic_idx)
-            # healing!(F, FSE)
-            FSE = getFSE(F, FSE)
+            # F = healing(F, FSE)
+            @timeit to "FSE" FSE, F = getFSE_healing(F, FSE, ϵ=1e3)
+            println("Max aspect ratio", extrema([f.a1./f.a2 for f in FSE]))
 
             #= Compute the viscous tensor =#
-            𝓒 = anisotropic_tensor(FSE, D, Valη)
+            @timeit to "viscous tensor" 𝓒 = anisotropic_tensor(FSE, D, Valη)
 
             #=
                 Diffusion solver
@@ -323,7 +326,7 @@ function main()
                         Fij : particle -> ip
                         T   : particle -> node
                 =#
-                F = F2ip(
+                @timeit to "F → ip" F = F2ip(
                     F, particle_fields, particle_info, particle_weights, gr.nel
                 )
 
@@ -353,6 +356,8 @@ function main()
                     min_num_particles = 3
                 )
             end
+
+            # healing!(F, FSE)
 
             println("mean T after advection  ", mean(T))
 
