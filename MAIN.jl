@@ -1,3 +1,4 @@
+using GLMakie
 import Pkg; Pkg.activate(".")
 using Persephone
 using LinearAlgebra, TimerOutputs
@@ -37,7 +38,7 @@ function main()
     load = false
 
     PhaseID = 1
-    # min_inradius = inradius(gr)
+    min_inradius = inradius(gr)
     min_inradius = inrectangle(gr)
 
     nU = maximum(gr.e2n)
@@ -218,7 +219,7 @@ function main()
             println("mean speed  ", mean(@views @. (√(U[1:2:end]^2 + U[2:2:end]^2))))
 
             Δt = calculate_Δt(Ucartesian, nθ, min_inradius) # adaptive time-step
-
+            println("Δt = ", Δt)
             #=
                 Stress-Strain postprocessor
             =#
@@ -230,7 +231,6 @@ function main()
             # isotropic_lithosphere!(F, isotropic_idx)
             # F = healing(F, FSE)
             @timeit to "FSE" FSE, F = getFSE_healing(F, FSE, ϵ=1e3)
-            println("Max aspect ratio", extrema([f.a1./f.a2 for f in FSE]))
 
             #= Compute the viscous tensor =#
             @timeit to "viscous tensor" 𝓒 = anisotropic_tensor(FSE, D, Valη)
@@ -287,7 +287,7 @@ function main()
                     )
                 end
 
-                @timeit to "advection" particle_info, to = advection_RK2(
+                @timeit to "advection" particle_info, particle_weights, to = advection_RK2(
                     particle_info,
                     gr,
                     particle_weights,
@@ -295,6 +295,7 @@ function main()
                     Δt,
                     θThermal,
                     rThermal,
+                    coordinates,
                     IntC,
                     to,
                 )
@@ -305,7 +306,7 @@ function main()
             @timeit to "Locate articles" begin
                 #= Particle locations =#
                 particle_info, particle_weights, found = tsearch_parallel(
-                    particle_info, particle_weights, θThermal, rThermal, gr.neighbours, IntC
+                    particle_info, particle_weights, θThermal, rThermal, coordinates, gr, IntC
                 )
 
                 lost_particles = length(particle_info) - sum(found)

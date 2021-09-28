@@ -4,17 +4,18 @@ function step_RK(
     particle_weights,
     Ucartesian,
     xp0,
-    zp0, 
+    zp0,
     Δt, 
     θThermal, 
     rThermal, 
+    coordinates,
     IntC,
     multiplier,
 )
 
-    neighbours, e2n_p1 = gr.neighbours, gr.e2n_p1
+    e2n_p1 = gr.e2n_p1
 
-    # (a) velocity @ particles  
+    # (a) velocity @ particles
     particle_info = velocities2particle(particle_info,
                                         e2n_p1,
                                         particle_weights,
@@ -23,19 +24,22 @@ function step_RK(
     # velocities2particle_cubic!(gr, particle_info, Ucartesian)
 
     # (b) advect particles  
-    xp, zp, particle_info = particlesadvection(xp0, zp0, particle_info, Δt, multiplier=multiplier)
-    particle_info, particle_weights = 
-                    tsearch_parallel(particle_info, 
+    particle_info = particlesadvection(xp0, zp0, particle_info, Δt, multiplier=multiplier)
+
+    particle_info, particle_weights, found = tsearch_parallel(particle_info, 
                                     particle_weights, 
                                     θThermal, 
                                     rThermal, 
-                                    neighbours, 
+                                    coordinates,
+                                    gr, 
                                     IntC)
-    
+                                    
+    # println(length(particle_info) - sum(found), " lost particles")
+
     # (c) store particles velocity
     Uxp, Uzp = particle_velocity(particle_info)
 
-    return xp, zp, Uxp, Uzp, particle_info, particle_weights
+    return Uxp, Uzp, particle_info, particle_weights, found
 end
 
 function advection_RK2!(Particles, xp0, zp0, Uxp1, Uzp1, Uxp2, Uzp2, Δt)
@@ -69,14 +73,45 @@ function advection_RK2!(Particles, xp0, zp0, Uxp1, Uzp1, Uxp2, Uzp2, Δt)
     end
 end
 
+function final_advection_RK2!(Particles, xp0, zp0, Uxp1, Uzp1, Uxp2, Uzp2, Δt)
+    cte = Δt/2
+    Threads.@threads for i in eachindex(Particles)
+        @inbounds Particles[i].CCart.x = @muladd xp0[i] + (Uxp1[i] + Uxp2[i])*cte
+        @inbounds Particles[i].CCart.z = @muladd zp0[i] + (Uzp1[i] + Uzp2[i])*cte
+
+        @inbounds Particles[i].CPolar.x = atan(Particles[i].CCart.x, Particles[i].CCart.z)
+        @inbounds Particles[i].CPolar.z = sqrt(Particles[i].CCart.x^2 + Particles[i].CCart.z^2) 
+
+        # Fix θ
+        @inbounds if Particles[i].CPolar.x < 0
+            Particles[i].CPolar.x += 2π
+        elseif Particles[i].CPolar.x > 2π
+            Particles[i].CPolar.x -= 2π
+        end
+        
+        # Fix radius
+        @inbounds if Particles[i].CPolar.z < 1.22
+            Particles[i].CPolar.z = 1.22001
+            Particles[i].CCart.x = polar2x(Particles[i].CPolar)
+            Particles[i].CCart.z = polar2z(Particles[i].CPolar)
+
+        elseif Particles[i].CPolar.z > 2.22
+            Particles[i].CPolar.z = 2.21999
+            Particles[i].CCart.x = polar2x(Particles[i].CPolar)
+            Particles[i].CCart.z = polar2z(Particles[i].CPolar)
+        end
+
+    end
+end
+
 function advection_RK2(particle_info::Vector{PINFO}, gr, particle_weights, 
-    Ucartesian, Δt, θThermal, rThermal, IntC, to)
+    Ucartesian, Δt, θThermal, rThermal, coordinates, IntC, to)
     
     # Allocate a couple of buffer arrays
     xp0, zp0 = particle_coordinates(particle_info) # initial particle position
 
     # STEP 1 
-    xp1, zp1, Uxp1, Uzp1, particle_info, particle_weights = step_RK(
+    Uxp1, Uzp1, particle_info, particle_weights, found = step_RK(
         particle_info,
         gr,
         particle_weights,
@@ -86,29 +121,32 @@ function advection_RK2(particle_info::Vector{PINFO}, gr, particle_weights,
         Δt, 
         θThermal, 
         rThermal,
+        coordinates,
         IntC,
         1.0,
-    )
+    );
 
     # STEP 2 
-    _, _, Uxp2, Uzp2, particle_info, particle_weights = step_RK(
+    # _, _, _, _, particle_info, particle_weights, found = step_RK(
+    Uxp2, Uzp2, particle_info, particle_weights, found = step_RK(
         particle_info,
         gr,
         particle_weights,
         Ucartesian,
-        xp1,
-        zp1, 
+        xp0,
+        zp0, 
         Δt, 
         θThermal, 
         rThermal, 
+        coordinates,
         IntC,
         1.0,
-    )
+    );
 
     # (c) advect particles
     advection_RK2!(particle_info, xp0, zp0, Uxp1, Uzp1, Uxp2, Uzp2, Δt)
     
-    return particle_info, to
+    return particle_info, particle_weights, to
 end
 
 
@@ -244,13 +282,13 @@ end
 end
 
 function particlesadvection(xp0, zp0, Particles, Δt; multiplier=1)
-    np = length(Particles)
-    xp = Vector{Float64}(undef, np)
-    zp = similar(xp)
+    # np = length(Particles)
+    # xp = Vector{Float64}(undef, np)
+    # zp = similar(xp)
     Δtmultiplier = Δt * multiplier
     @fastmath Threads.@threads for i in eachindex(Particles)
-        @inbounds Particles[i].CCart.x = xp[i] = @muladd xp0[i] + Particles[i].UCart.x * Δtmultiplier
-        @inbounds Particles[i].CCart.z = zp[i] = @muladd zp0[i] + Particles[i].UCart.z * Δtmultiplier
+        @inbounds Particles[i].CCart.x = @muladd xp0[i] + Particles[i].UCart.x * Δtmultiplier
+        @inbounds Particles[i].CCart.z = @muladd zp0[i] + Particles[i].UCart.z * Δtmultiplier
         @inbounds Particles[i].CPolar.x = atan(Particles[i].CCart.x, Particles[i].CCart.z)
         @inbounds Particles[i].CPolar.z =
             @muladd √(Particles[i].CCart.x*Particles[i].CCart.x + Particles[i].CCart.z*Particles[i].CCart.z) 
@@ -265,15 +303,15 @@ function particlesadvection(xp0, zp0, Particles, Δt; multiplier=1)
         # Fix radius
         @inbounds if Particles[i].CPolar.z < 1.22
             Particles[i].CPolar.z = 1.22001
-            Particles[i].CCart.x = xp[i] = polar2x(Particles[i].CPolar)
-            Particles[i].CCart.z = zp[i] = polar2z(Particles[i].CPolar)
+            Particles[i].CCart.x = polar2x(Particles[i].CPolar)
+            Particles[i].CCart.z = polar2z(Particles[i].CPolar)
         elseif Particles[i].CPolar.z > 2.22
             Particles[i].CPolar.z = 2.21999
-            Particles[i].CCart.x = xp[i] = polar2x(Particles[i].CPolar)
-            Particles[i].CCart.z = zp[i] = polar2z(Particles[i].CPolar)
+            Particles[i].CCart.x = polar2x(Particles[i].CPolar)
+            Particles[i].CCart.z = polar2z(Particles[i].CPolar)
         end
     end
-    return xp, zp, Particles
+    return Particles
 end
 
 function particlesadvection!(xp, zp, xp0, zp0, particle_info, Δt; multiplier=1)

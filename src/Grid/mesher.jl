@@ -6,24 +6,25 @@ mutable struct Point2D{T}
     z::Float64
 end
 
-struct Grid{T,N}
-    x::Vector{T}
-    z::Vector{T}
-    θ::Vector{T}
-    r::Vector{T}
-    e2n::Matrix{N}
-    e2n_p1::Matrix{N}
-    e2nP::Matrix{N}
-    nel::N
-    nnod::N
-    nVnod::N
-    nvert::N
-    neighbours::Vector{Vector{N}}
+struct Grid{A,B,C,D}
+    x::A
+    z::A
+    θ::A
+    r::A
+    e2n::B
+    e2n_p1::B
+    e2nP::B
+    nel::C
+    nnod::C
+    nVnod::C
+    nvert::C
+    neighbours::D
+    neighbours_p1::D
 end
 
 struct ElementCoordinates{T}
-    θ::Matrix{T}
-    r::Matrix{T}
+    θ::T
+    r::T
 end
 
 cartesian2polar(x,z) = (atan(x,z), sqrt(x^2+z^2))
@@ -116,6 +117,7 @@ function Grid(nθ::Int64, nr::Int64; r_out=2.22, r_in=1.22)
         nnod,
         nVnod,
         3,
+        neighbours,
         neighbours_p1)
 end
 
@@ -232,15 +234,16 @@ function inradius(gr::Grid)
 end
 
 function inrectangle(gr::Grid)
-    # https://en.wikibooks.org/wiki/Trigonometry/Circles_and_Triangles/The_Incircle
-    x, z, nel, e2n = gr.x, gr.z, gr.nel, gr.e2n_p1
+    # define a percentage of the diagonal
+    x, z, nel, e2n = gr.x, gr.z, gr.nel*4, gr.e2n_p1
+    # x, z, nel, e2n = gr.x, gr.z, gr.nel, gr.e2n
     r = Vector{Float64}(undef,nel)
     @inbounds @fastmath for iel in 1:nel
         xv = ntuple(i->x[e2n[i,iel]], 3) # verteices x-coords
         zv = ntuple(i->z[e2n[i,iel]], 3) # verteices z-coords
         xmin, xmax = extrema(xv)
         zmin, zmax = extrema(zv)
-        r[iel] = √( (xmin-xmax)^2 + (zmin-zmax)^2) /2 # inradius
+        r[iel] = √( (xmin-xmax)^2 + (zmin-zmax)^2) # inradius
     end
 
     minimum(r)
