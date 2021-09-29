@@ -23,10 +23,10 @@ function init_temperature(gr, IDs; type = :harmonic)
 
     if type == :harmonic
         # Harmonic hermal perturbation
+        s = @. (2.22-r)/(2.22-1.22)
         y44 = @. 1.0/8.0*√(35.0/π)*cos(4.0*θ)
         δT = @. 0.2*y44*sin(π*(1-s))
         T = @. 1.22*s/(2.22-s) + δT
-        s = @. (2.22-r)/(2.22-1.22)
 
     elseif type == :random
         # Linear temperature with random perturbation
