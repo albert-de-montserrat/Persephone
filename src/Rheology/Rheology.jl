@@ -24,12 +24,16 @@ function getviscosity(T, type; η=1)
 
     elseif type == :TemperatureDependantIsotropic
         return TemperatureDependant{Isotropic}(@. exp(13.8156*(0.5-T)))
-        # return TemperatureDependant{Anisotropic}(@. exp(23.03/(1+T) -23.03/2))
+
+    elseif type == :VanHeckIsotropic
+        return TemperatureDependant{Isotropic}(@. exp(23.03/(1+T) -23.03/2))
         # return TemperatureDependant{Isotropic}(@. exp(-log(1e5)*T))
 
     elseif type == :TemperatureDependantAnisotropic
         return TemperatureDependant{Anisotropic}(@. exp(13.8156*(0.5-T)))
-        # return TemperatureDependant{Anisotropic}(@. exp(23.03/(1+T) -23.03/2))
+    
+    elseif type == :VanHeckAnisotropic
+        return TemperatureDependant{Anisotropic}(@. exp(23.03/(1+T) -23.03/2))
         # return TemperatureDependant{Anisotropic}(@. exp(1e3^(-T)))
         
     end
