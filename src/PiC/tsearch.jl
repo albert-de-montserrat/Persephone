@@ -261,7 +261,7 @@ function purgeparticles(particle_info, particle_weights, particle_fields, found)
     particle_info = [@inbounds particle_info[i] for i in ikeep]
     particle_weights = [@inbounds particle_weights[i] for i in ikeep]
 
-    Threads.@threads for i in eachindex(T)
+    Threads.@threads for i in eachindex(found)
         if ikeep==false
             popat!(particle_fields.T, i)
             popat!(particle_fields.Fxx, i)
