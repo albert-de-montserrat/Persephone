@@ -84,13 +84,9 @@ end
 function healing_FSE!(FSE, F, iel, ϵ)
     
     # Compute FSE
-    Fi = F[iel]
-    eigval, evect = eigen(Fi * Fi')
-    if eigval[2] > eigval[1]
-        imax, imin = 2, 1
-    else
-        imax, imin = 1, 2
-    end
+    Fi = normalize_F(F[iel]) # normalize F if its too big, otherwise F*F' will be Inf
+    eigval, evect = eigen(Fi * Fi') # get length of FSE semi-axes and orientation
+    imax, imin = eigval_order(eigval) # get the right order of the semi-axis length
 
     a1 = √(abs(eigval[imax]))
     a2 = √(abs(eigval[imin]))
