@@ -192,7 +192,6 @@ function main()
             #=
                 Stokes solver using preconditioned-CG
             =#    
-            reset_timer!(to)
             Ucartesian, Upolar, U, Ucart, P, to = solveStokes(
                 U,
                 P,
@@ -213,7 +212,6 @@ function main()
                 to,
                 solver = :pardiso
             );
-            to
 
             println("min:max Uθ", extrema(@views U[1:2:end]))
             println("mean speed  ", mean(@views @. (√(U[1:2:end]^2 + U[2:2:end]^2))))
@@ -223,11 +221,9 @@ function main()
             #=
                 Stress-Strain postprocessor
             =#
-            # F, τ, ε, τII, εII = stress(
-            #     Ucart, T, F, 𝓒, τ, ε, gr.e2n, θStokes, rStokes, η, PhaseID, Δt
-            # )
-            @timeit to "F" stress!(F, Ucart, gr.nel, DoF_U, coordinates, SF_Stress, Δt)
-            
+            @timeit to "F" stress!(F, ε, Ucart, gr.nel, DoF_U, coordinates, SF_Stress, Δt)
+            εII = secondinvariant(ε)
+
             # isotropic_lithosphere!(F, isotropic_idx)
             # F = healing(F, FSE)
             @timeit to "FSE" FSE, F = getFSE_healing(F, FSE, ϵ=1e3)
