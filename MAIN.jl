@@ -213,7 +213,7 @@ function main()
                 solver = :pardiso
             );
 
-            println("min:max Uθ", extrema(@views U[1:2:end]))
+            println("min:max Uθ ", extrema(@views U[1:2:end]))
             println("mean speed  ", mean(@views @. (√(U[1:2:end]^2 + U[2:2:end]^2))))
 
             Δt = calculate_Δt(Ucartesian, nθ, min_inradius) # adaptive time-step

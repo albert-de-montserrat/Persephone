@@ -68,8 +68,8 @@ function _FSE!(FSE, F, iel)
         evect[1,imin]::Float64, # vx2
         evect[2,imax]::Float64, # vy1
         evect[2,imin]::Float64, # vy2
-        √(eigval[imax])::Float64, # a1 
-        √(eigval[imin])::Float64, # a2
+        √(abs(eigval[imax]))::Float64, # a1 
+        √(abs(eigval[imin]))::Float64, # a2
     )
 
 end
