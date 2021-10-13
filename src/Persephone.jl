@@ -178,6 +178,7 @@ include("Stress/StressCalculation.jl")
 export SymmetricTensor
 export Gradient
 export initstress
+export secondinvariant
 export stress!
 export stress
 

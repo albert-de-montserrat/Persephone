@@ -20,6 +20,7 @@ end
 
 function _stress!(
     F,
+    ε,
     U,
     iel,
     DoF_U,
@@ -33,13 +34,13 @@ function _stress!(
     # η, 
     # 𝓒,
 
-    ∇N, dN3ds, N3 = 
-        SF_Stress.∇N, SF_Stress.dN3ds, SF_Stress.N3 
+    # unpack shape functions
+    ∇N, dN3ds, N3 = SF_Stress.∇N, SF_Stress.dN3ds, SF_Stress.N3 
     
     # Polar coordinates of element nodes
     θ_el = @SVector [θ[i, iel] for i in 1:3]
     r_el = @SVector [r[i, iel] for i in 1:3]
-    coords = SMatrix{3,2}([θ_el r_el])
+    coords = SMatrix{3,2}([θ_el r_el]) # could directly allocate just this one 
 
     # Jacobian n. 1 (p:=polar, l:=local): reference element --> current element
     J_pl = dN3ds * coords
@@ -63,10 +64,10 @@ function _stress!(
     ]
 
     # INTEGRATION LOOP
+    onesixth = 1/6
     @inbounds for ip in 1:6
 
         # Unpack shape functions 
-
         N3_ip = N3[ip]
         ∇N_ip = ∇N[ip]
 
@@ -76,15 +77,15 @@ function _stress!(
 
         # Polar coordinates of the integration points
         θ_ip = mydot(θ_el, N3_ip)
-        r_ip = mydot(r_el, N3_ip)
+        invr_ip = 1/mydot(r_el, N3_ip)
         sin_ip, cos_ip = sincos(θ_ip)
-        cos_ip_r_ip = cos_ip / r_ip
-        sin_ip_r_ip = sin_ip / r_ip
+        cos_ip_r_ip = cos_ip * invr_ip
+        sin_ip_r_ip = sin_ip * invr_ip
 
         # Build inverse of the 2nd Jacobian
         invJ_double = @SMatrix [
-             R_31*cos_ip_r_ip-Th_31*sin_ip   -R_21*cos_ip_r_ip+Th_21*sin_ip
-            -R_31*sin_ip_r_ip-Th_31*cos_ip    R_21*sin_ip_r_ip+Th_21*cos_ip
+            @muladd( R_31*cos_ip_r_ip-Th_31*sin_ip)   @muladd(-R_21*cos_ip_r_ip+Th_21*sin_ip)
+            @muladd(-R_31*sin_ip_r_ip-Th_31*cos_ip)   @muladd( R_21*sin_ip_r_ip+Th_21*cos_ip)
         ]
 
         # Partial derivatives
@@ -93,6 +94,11 @@ function _stress!(
         ∂Uz∂z = dot(view(∂N∂x,2,:), Uel_z)
         ∂Ux∂z = dot(view(∂N∂x,2,:), Uel_x)
         ∂Uz∂x = dot(view(∂N∂x,1,:), Uel_z)
+
+        # update stain rate tensor
+        ε.xx[iel, ip] = ∂Ux∂x
+        ε.zz[iel, ip] = ∂Uz∂z
+        ε.xz[iel, ip] = 0.5*(∂Ux∂z+∂Uz∂x)
 
         # transpose of the velocity gradient
         ∇Uᵀ = @SMatrix [
@@ -110,16 +116,27 @@ function _stress!(
         k3 = Δt∇Uᵀ * Fi
         Fi = k3 .+ F0
         k4 = Δt∇Uᵀ * Fi
-        F[iel, ip] = F0 + (k1 + 2*(k2 + k3) + k4)/6
+        F[iel, ip] = F0 + (k1 + 2*(k2 + k3) + k4)*onesixth
         
     end
 
 end
 
-function stress!(F, U, nel, DoF_U, coordinates, SF_Stress, Δt)
+function stress!(F, ε, U, nel, DoF_U, coordinates, SF_Stress, Δt)
     @batch per=core for iel in 1:nel
-        _stress!(F, U, iel, DoF_U, coordinates.θ, coordinates.r, SF_Stress, Δt)
+        _stress!(F, ε, U, iel, DoF_U, coordinates.θ, coordinates.r, SF_Stress, Δt)
     end
+end
+
+secondinvariant(xx,zz,xz) = sqrt( 0.5*(xx^2 + zz^2) + xz^2 ) 
+
+@inline function secondinvariant(A::SymmetricTensor)
+    II  = Matrix{Float64}(undef, size(A.xx))
+    xx, zz, xz = A.xx, A.zz, A.xz
+    @batch for i in eachindex(xx)
+        II[i] = √( @muladd 0.5*(xx[i]*xx[i] + zz[i]*zz[i]) + xz[i]*xz[i]) 
+    end
+    return II
 end
 
 function stress(U, T, F, 𝓒, τ, ε, EL2NOD, theta, r, η, PhaseID, Δt)
@@ -441,18 +458,6 @@ end
         Fzz_blk[i] += @muladd (k1zz + 2*(k2zz + k3zz) + k4zz)*one_sixth
     end
 
-end
-
-secondinvariant(xx,zz,xz) = sqrt( 0.5*(xx^2 + zz^2) + xz^2 ) 
-
-@inline function secondinvariant(A::SymmetricTensor)
-    m, n = size(A.xx)
-    II  = Matrix{Float64}(undef,m,n)
-    xx, zz, xz = A.xx, A.zz, A.xz
-    @turbo for i in eachindex(A.xx)
-        II[i] = √( 0.5*(xx[i]^2 + zz[i]^2) + xz[i]^2) 
-    end
-    return II
 end
 
 @inline function _fillstress!(F, τ, ε,

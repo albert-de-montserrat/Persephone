@@ -40,16 +40,27 @@ function getFSE(F, FSE)
     FSE
 end 
 
+function normalize_F(F; ϵ = 1e30)
+    Fmax = abs(maximum(F)) # take absolute value because we do not want to change the sign of Fij
+    if Fmax > ϵ
+        return F./Fmax
+    else 
+        return F
+    end
+end
+
+eigval_order(eigval) = ifelse(
+    @inbounds(eigval[2] > eigval[1]),
+    (2, 1),
+    (1, 2)
+)
+
 function _FSE!(FSE, F, iel)
     
     # Compute FSE
-    Fi = F[iel]
-    eigval, evect = eigen(Fi * Fi')
-    if eigval[2] > eigval[1]
-        imax, imin = 2, 1
-    else
-        imax, imin = 1, 2
-    end
+    Fi = normalize_F(F[iel]) # normalize F if its too big, otherwise F*F' will be Inf
+    eigval, evect = eigen(Fi * Fi') # get length of FSE semi-axes and orientation
+    imax, imin = eigval_order(eigval) # get the right order of the semi-axis length
 
     # Fill FSE
     FSE[iel] = FiniteStrainEllipsoid(
@@ -57,8 +68,8 @@ function _FSE!(FSE, F, iel)
         evect[1,imin]::Float64, # vx2
         evect[2,imax]::Float64, # vy1
         evect[2,imin]::Float64, # vy2
-        √(abs(eigval[imax]))::Float64, # a1 
-        √(abs(eigval[imin]))::Float64, # a2
+        √(eigval[imax])::Float64, # a1 
+        √(eigval[imin])::Float64, # a2
     )
 
 end
