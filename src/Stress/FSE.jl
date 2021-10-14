@@ -24,21 +24,51 @@ function healing(F, FSE)
         end
     end
     return F
-    # Threads.@threads for i in axes(F, 1)
-    #     @inbounds if mean([f.a1./f.a2 for f in FSE]) > 1e2
-    #         for j in axes(F,2)
-    #             F[i,j] = Is
-    #         end
-    #     end
-    # end
 end
 
 function getFSE(F, FSE)
-    @batch for iel in CartesianIndices(F)
-        _FSE!(FSE, F, iel)
+    # F can grow A LOT in long computations, eventually overflowing at ~1e309
+    # Thus we need to normalize F from time to time. We normalize F ∈ Ω w.r.t.
+    # the same number (max(F[1])), otherwise a heterogeneous normalization 
+    # will screw up the particles interpolation 
+    normalize_F!(F) 
+    Threads.@threads for iel in CartesianIndices(F)
+        @inbounds FSE[iel] = _FSE(F[iel])
     end
     FSE
 end 
+
+function _FSE(Fi)
+    
+    # Compute FSE
+    # Fi = normalize_F(F) # normalize F if its too big, otherwise F*F' will be Inf
+    L = Fi * Fi' # left-strecth tensor
+    # eigval, evect = eigen(Fi * Fi') # get length of FSE semi-axes and orientation
+    # imax, imin = eigval_order(eigval) # get the right order of the semi-axis length
+    eigval, evect, imax, imin = _eigen(L) # get length of FSE semi-axes and orientation
+                                          # and the right order of eigvals and eigvects
+
+    # Fill FSE
+    FiniteStrainEllipsoid(
+        evect[1,imax], # vx1
+        evect[1,imin], # vx2
+        evect[2,imax], # vy1
+        evect[2,imin], # vy2
+        √(abs(eigval[imax])), # a1 
+        √(abs(eigval[imin])), # a2
+    )
+
+end
+
+function normalize_F!(F; ϵ = 1e50)
+    order = log10(F[1][1]) # need to check only one component, as the rest will havea similar exponent
+    if order > ϵ
+        normalizer = 1/abs(maximum(F[1])) # make sure we take the absolute value, don't want to change signs
+        Threads.@threads for i in eachindex(F)
+            @inbounds @fastmath F[i] .*= normalizer
+        end
+    end
+end
 
 function normalize_F(F; ϵ = 1e30)
     Fmax = abs(maximum(F)) # take absolute value because we do not want to change the sign of Fij
@@ -55,27 +85,8 @@ eigval_order(eigval) = ifelse(
     (1, 2)
 )
 
-function _FSE!(FSE, F, iel)
-    
-    # Compute FSE
-    Fi = normalize_F(F[iel]) # normalize F if its too big, otherwise F*F' will be Inf
-    eigval, evect = eigen(Fi * Fi') # get length of FSE semi-axes and orientation
-    imax, imin = eigval_order(eigval) # get the right order of the semi-axis length
-
-    # Fill FSE
-    FSE[iel] = FiniteStrainEllipsoid(
-        evect[1,imax]::Float64, # vx1
-        evect[1,imin]::Float64, # vx2
-        evect[2,imax]::Float64, # vy1
-        evect[2,imin]::Float64, # vy2
-        √(abs(eigval[imax]))::Float64, # a1 
-        √(abs(eigval[imin]))::Float64, # a2
-    )
-
-end
-
-function getFSE_healing(F, FSE; ϵ = 1e2)
-    @batch for iel in eachindex(F)
+function getFSE_healing(F, FSE; ϵ = 1e3)
+    Threads.@threads for iel in eachindex(F)
         healing_FSE!(FSE, F, iel, ϵ)
     end
     FSE, F
@@ -115,6 +126,55 @@ function healing_FSE!(FSE, F, iel, ϵ)
 
     end
 
+end
+
+function getFSE_annealing!(F, FSE, annealing)
+    Threads.@threads for iel in eachindex(F)
+        @inbounds FSE[iel] = _FSE_annealing(F[iel], annealing)
+    end
+end
+
+function _FSE_annealing(
+    F, 
+    s
+)
+    
+    # Compute FSE
+    Fi = normalize_F(F) # normalize F if its too big, otherwise F*F' will be Inf
+    L = Fi * Fi' # left-strecth tensor
+    # eigval, evect = eigen(Fi * Fi') # get length of FSE semi-axes and orientation
+    # imax, imin = eigval_order(eigval) # get the right order of the semi-axis length
+    eigval, evect, imax, imin = _eigen(L) # get length of FSE semi-axes and orientation
+                                          # and the right order of eigvals and eigvects
+                                        
+    # principal semi-axes
+    a1, a2 = √(abs(eigval[imax])),  √(abs(eigval[imin]))
+    # eigenvectors
+    λ11, λ12, λ21, λ22 = evect[1,imax], evect[2,imax], evect[1,imin], evect[2,imin]
+    # unstretch semi-axes due to annealing
+    a1u, a2u = unstretch_axes(a1, a2, s)
+    # Fu = recover_F(Fi, L, λ11, λ12, λ21, λ22, a1u, a2u)
+    # Fu = recover_F(Fi, L, λ11, λ12, λ21, λ22, a1, a2)
+
+    # Fill FSE
+    FSE = FiniteStrainEllipsoid(
+        λ11, # vx1
+        λ21, # vx2
+        λ12, # vy1
+        λ22, # vy2
+        a1u, 
+        a2u,
+    )
+
+    return FSE
+
+end
+
+function _eigen(A)
+    eigval::SVector{2, Float64}, evect::SMatrix{2, 2, Float64} = eigen(A) # get length of FSE semi-axes and orientation
+    # eigval, evect = eigen(A) # get length of FSE semi-axes and orientation
+    imax, imin = eigval_order(eigval) # get the right order of the semi-axis length
+    return eigval, evect, imax, imin
 end
 
 function volume_integral(V, EL2NOD, θ, r)

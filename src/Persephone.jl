@@ -16,6 +16,7 @@ using MuladdMacro
 using Krylov
 
 import Statistics: mean
+import .Base:*
 
 # LinearAlgebra.BLAS.set_num_threads(1)
 
@@ -69,6 +70,7 @@ export FiniteStrainEllipsoid
 export volume_integral
 export getFSE
 export getFSE_healing
+export getFSE_annealing!
 export rebuild_FSE
 export isotropic_lithosphere!
 export healing
@@ -181,5 +183,8 @@ export initstress
 export secondinvariant
 export stress!
 export stress
+
+include("Stress/Annealing.jl")
+export Annealing
 
 end # module
