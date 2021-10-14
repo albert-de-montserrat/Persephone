@@ -26,6 +26,27 @@ function healing(F, FSE)
     return F
 end
 
+
+function normalize_F!(F; ϵ = 1e50)
+    normalizer = abs(maximum(F[1])) # make sure we take the absolute value, don't want to change signs
+    order = log10(normalizer) # need to check only one component, as the rest will havea similar exponent
+    if order > ϵ
+        normalizer = 1/normalizer
+        Threads.@threads for i in eachindex(F)
+            @inbounds @fastmath F[i] .*= normalizer
+        end
+    end
+end
+
+function normalize_F(F; ϵ = 1e30)
+    Fmax = abs(maximum(F)) # take absolute value because we do not want to change the sign of Fij
+    if Fmax > ϵ
+        return F./Fmax
+    else 
+        return F
+    end
+end
+
 function getFSE(F, FSE)
     # F can grow A LOT in long computations, eventually overflowing at ~1e309
     # Thus we need to normalize F from time to time. We normalize F ∈ Ω w.r.t.
@@ -58,25 +79,6 @@ function _FSE(Fi)
         √(abs(eigval[imin])), # a2
     )
 
-end
-
-function normalize_F!(F; ϵ = 1e50)
-    order = log10(F[1][1]) # need to check only one component, as the rest will havea similar exponent
-    if order > ϵ
-        normalizer = 1/abs(maximum(F[1])) # make sure we take the absolute value, don't want to change signs
-        Threads.@threads for i in eachindex(F)
-            @inbounds @fastmath F[i] .*= normalizer
-        end
-    end
-end
-
-function normalize_F(F; ϵ = 1e30)
-    Fmax = abs(maximum(F)) # take absolute value because we do not want to change the sign of Fij
-    if Fmax > ϵ
-        return F./Fmax
-    else 
-        return F
-    end
 end
 
 eigval_order(eigval) = ifelse(
