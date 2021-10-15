@@ -14,6 +14,7 @@ using Pardiso
 using Fabrics
 using MuladdMacro
 using Krylov
+using MKLSparse
 
 import Statistics: mean
 import .Base:*
