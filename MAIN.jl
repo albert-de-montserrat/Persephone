@@ -1,4 +1,4 @@
-using GLMakie
+# using GLMakie
 import Pkg; Pkg.activate(".")
 using Persephone
 using LinearAlgebra, TimerOutputs
@@ -15,14 +15,14 @@ function main()
     else
         path = "/home/albert/Desktop/output"
     end
-    folder = "Healing1e6_Tdep_iso"
+    folder = "No_Annealing_test"
     OUT, iplot = setup_output(path, folder)
 
     #=========================================================================
         MAKE GRID
     =========================================================================#
     split = 2
-    N = 3
+    N = 4
     if split == 1
         nr = Int(1 + 2^N)
         nθ = Int(12 * 2^N)
@@ -30,16 +30,16 @@ function main()
     else
         nr = Int(1+2^N)
         nθ = Int(12*2^N)
-        nr = Int(1 + 32)
-        nθ = Int(256)
+        # nr = Int(1 + 32)
+        # nθ = Int(256)
         gr = Grid(nθ, nr)
     end
     IDs = point_ids(gr)
     load = false
 
     PhaseID = 1
-    min_inradius = inradius(gr)
-    min_inradius = inrectangle(gr)
+    # min_inradius = inradius(gr)
+    min_inradius = inrectangle(gr)/2
 
     nU = maximum(gr.e2n)
     nnod = length(gr.θ)
@@ -113,13 +113,16 @@ function main()
     # Initialise temperature @ particles
     init_particle_temperature!(particle_fields, particle_info, type = perturbation)
 
-    viscosity_type = :TemperatureDependantAnisotropic
-    #= Options:
+    # Annealing rate
+    annealing = Annealing(1e-1)
+
+    #= Viscosity type. Options:
         (*) "IsoviscousIsotropic"
         (*) "TemperatureDependantIsotropic"
         (*) "IsoviscousAnisotropic"
         (*) "TemperatureDependantAnisotropic"
     =#
+    viscosity_type = :TemperatureDependantAnisotropic
 
     # Physical parameters for thermal diffusion
     VarT = thermal_parameters(
@@ -181,7 +184,7 @@ function main()
     Time = 0.0
     T0 = deepcopy(T)
 
-    for iplot in 1:500
+    for iplot in 1:100
         for _ in 1:100
             reset_timer!(to)
 
@@ -226,7 +229,12 @@ function main()
 
             # isotropic_lithosphere!(F, isotropic_idx)
             # F = healing(F, FSE)
-            @timeit to "FSE" FSE, F = getFSE_healing(F, FSE, ϵ=1e3)
+            @timeit to "FSE" FSE = getFSE(F, FSE)
+            # F0, FSE0 = deepcopy(F), deepcopy(FS)
+            # @timeit to "FSE" FSE, F = getFSE_healing(F, FSE, ϵ=1e3)
+            # @timeit to "FSE" getFSE_annealing!(F, FSE, annealing*(Time+Δt))
+            # F11 = [f[1,1] for f in F]
+            # iel=findall(isnan.(F11))[1]
 
             #= Compute the viscous tensor =#
             @timeit to "viscous tensor" 𝓒 = anisotropic_tensor(FSE, D, Valη)

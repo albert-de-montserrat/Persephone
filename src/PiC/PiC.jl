@@ -367,7 +367,6 @@ end
 # INTERPOLATE TEMPERATURE FROM NODES TO PARTICLES =======================================
 @inline function initial_particle_temperature!(particle_fields, e2n_p1, T, particle_info, particle_weights)
     np = length(particle_info)    
-    # loop
     Threads.@threads for i in 1:np
         # -- Temperature interpolation (weighted average)
         @inbounds particle_fields.T[i] = weightednode2particle(

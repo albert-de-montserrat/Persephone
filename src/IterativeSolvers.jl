@@ -32,6 +32,8 @@ function StokesPcCG_pardiso(U, P, KK, MM, GG, Rhs, ifree)
     # d = _precondition(pc, MM, r) # precondition residual
     d = _precondition(pc, r) # precondition residual
     q = deepcopy(d)  # define FIRST search direction q
+    y = Vector{Float64}(undef, size(GG, 1))
+    Sq = Vector{Float64}(undef, size(GGtransp, 1))
     rlast = similar(r)
     for itPat = 1:itmax_Pat
         itnum +=1
@@ -48,11 +50,13 @@ function StokesPcCG_pardiso(U, P, KK, MM, GG, Rhs, ifree)
             (3) Sq  = G'*z
         =============================================================#
         # (1) y   = G*q
-        y = spmv(GG, q)
+        # spmv!(y, GG, q)
+        y .= GG*q
         # (2) Solve K z = y
         _MKLsolve!(z, A_pardiso, ps, y, ifree)
         # (3) Sq  = G'*z
-        Sq = GGtransp*z
+        # spmv!(Sq, GGtransp, z)
+        Sq .= GGtransp*z
         #=============================================================#
         qSq = mydot(q,Sq) # denominator to calculate alpha
         copyto!(rlast, r) # needed for Polak-Ribiere version 1
