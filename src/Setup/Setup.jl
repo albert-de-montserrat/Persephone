@@ -14,6 +14,13 @@ function thermal_parameters(;
     ThermalParameters(κ, α, Cp, dQdT)
 end
 
+function init_U_P(gr)
+    nU = maximum(gr.e2n)
+    P = fill(0.0, maximum(gr.e2nP))
+    U = fill(0.0, nU .* 2)
+    return U, P
+end
+
 function init_temperature(gr, IDs; type = :harmonic)
     
     θ = gr.θ

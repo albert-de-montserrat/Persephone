@@ -20,13 +20,15 @@ function solveStokes(U, P, gr, Ucartesian,Upolar, g, ρ, η, 𝓒,
            assembly_stokes_cylindric(gr, coordinates, g, ρ, η, 𝓒, PhaseID, KKidx, GGidx, MMidx)
 
         KK,GG,Rhs = _prepare_matrices(KK, GG, Rhs, RotationMatrices)
-            U,Rhs = _apply_bcs(U,KK,Rhs,∂Ωu,ufix)
+        U,Rhs = _apply_bcs(U,KK,Rhs,∂Ωu,ufix)
 
         if solver == :pardiso    
             @timeit to "PCG solver" U, P = StokesPcCG_pardiso(U, P, KK, MM, GG, Rhs, ifree)
+            # @timeit to "PCG solver" U, P = StokesPcCG_gpu(U, P, KK, MM, GG, Rhs, ifree)
         elseif solver == :suitesparse    
             @timeit to "PCG solver" U, P = StokesPcCG(U, P, KK, MM, GG, Rhs, ifree)
         end    
+        
         U, Ucart, Upolar, Ucartesian = 
             updatevelocity2(U, Ucartesian, Upolar, ρ, RotationMatrices.TT, coordinates, gr)
     end
@@ -181,12 +183,12 @@ end
 @inline function _prepare_matrices(KK,GG,Fb,RotationMatrices)
     KK = SparseMatrixCSC(Symmetric(KK,:L))
     dropzeros!(KK)
-    dropzeros!(GG)   
+    dropzeros!(GG)
     KK = RotationMatrices.TTᵀ*KK*RotationMatrices.TT
     GG = RotationMatrices.TTᵀ*GG
     Fb = RotationMatrices.TTᵀ*Fb
     KK = SparseMatrixCSC(Symmetric(KK,:L))
-    return KK,GG,Fb
+    return KK, GG, Fb
 end
 
 @inline function rotation_matrix(theta)
@@ -227,9 +229,9 @@ end
         # KK1_T[i2]      = sint # element (2,1) in the rotation matrix [TT] 
     end
     
-    TT = sparse(KKi_T,KKj_T,KK1_T)
-    transTT = SparseMatrixCSC(TT')
-
+    TT = ThreadedSparseMatrixCSC(sparse(KKi_T,KKj_T,KK1_T))
+    transTT = ThreadedSparseMatrixCSC(SparseMatrixCSC(TT'))
+    
     return RotationMatrix(TT, transTT)
 
 end
@@ -240,7 +242,6 @@ function assembly_stokes_cylindric(gr, coordinates, g, ρ, η, 𝓒, PhaseID,KKi
     
     # ============================================ MODEL AND BLOCKING PARAMETERS
     ndim            = 2
-    # nvert           = 3
     nnodel          = size(EL2NOD,1)
     nel             = size(EL2NOD,2)
     nelblk          = min(nel, 1200)
@@ -511,10 +512,9 @@ end
     r_ip = similar(detJ_PL)
     NP_blk = Matrix{Float64}(undef, length(detJ_PL), 3)
 
-    @inbounds for ip=1:nip
+    @inbounds for ip in 1:nip
 
         N_ip = N3[ip]
-        # NP_blk = repeat(NP[ip],nelblk,1)
         NP_blk .= NP[ip].*ones(nelblk)
 
         #=======================================================================
@@ -531,7 +531,6 @@ end
         NOTE: For triangular elements with curved edges the Jacobian needs to be computed at each integration
                point (inside the integration loop).
         ===========================================================================================================#
-
         gemmt!(th_ip,  VCOORD_th', N_ip')
         gemmt!(r_ip,  VCOORD_r', N_ip')
 
@@ -547,7 +546,7 @@ end
         _fill_Mblk!(M_blk,Visc_blk,NP_blk,
             ω, nPdofel)
 
-        _fill_Fbblk!(Fb_blk,Fg_blk, N[ip],
+        _fill_Fbblk!(Fb_blk, Fg_blk, N[ip],
             ω, sin_ip,cos_ip,nUdofel)
 
     end # end integration point loop
@@ -601,13 +600,13 @@ end
             # x-velocity equation (1st, 3rd, 5th,... rows of stiffness matrices)            
             @inbounds @simd for k in 1:nn
                 # x-velocity (1st, 3th, 5th,... columns)
-                K_blk[k,indx] +=  Visc_blk[k]*ω[k] *
+                K_blk[k, indx] +=  Visc_blk[k]*ω[k] *
                     ( C1 * dNdx[k,i]*dNdx[k,j] + dNdy[k,i]*dNdy[k,j])                                                
             end            
             indx   += 1
             @inbounds @simd for k in 1:nn
                 # y-velocity equation (2nd, 4th, 6th,... rows of stiffness matrices)
-                K_blk[k,indx] +=  Visc_blk[k]*ω[k] *
+                K_blk[k, indx] +=  Visc_blk[k]*ω[k] *
                     ( -C2 * dNdx[k,i]*dNdy[k,j] + dNdy[k,i]*dNdx[k,j])                                
             end
             indx   += 1
@@ -618,14 +617,14 @@ end
                 # x-velocity equation (3rd, 5th, 7th... rows of stiffness matrices)            
                 @inbounds @simd for k in 1:nn
                     # x-velocity (1st, 3th, 5th,... columns)
-                    K_blk[k,indx] +=  Visc_blk[k]*ω[k] * 
+                    K_blk[k, indx] +=  Visc_blk[k]*ω[k] * 
                         (-C2 * dNdy[k,i]*dNdx[k,j] + dNdx[k,i]*dNdy[k,j])                                
                 end
                 indx   += 1
             end
             @inbounds @simd for k in 1:nn
                 # y-velocity equation (2nd, 4th, 6th,... rows of stiffness matrices)
-                K_blk[k,indx] +=   Visc_blk[k]*ω[k] *
+                K_blk[k, indx] += Visc_blk[k]*ω[k] *
                     ( C1 * dNdy[k,i]*dNdy[k,j] + dNdx[k,i]*dNdx[k,j]) 
             end
             indx += 1

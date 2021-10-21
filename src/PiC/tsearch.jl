@@ -141,7 +141,7 @@ end
 
 @inline function distance(p1::Point2D{Polar},p2::Array{Point2D{Polar},1}) 
     ld = length(p2)
-    d  = Vector{Float64}(undef,ld)
+    d  = Vector{Float64}(undef, ld)
     @inbounds for i in 1:ld
         d[i] = √( p1.z^2 + p2[i].z^2 - 2p1.z*p2[i].z*cos(p1.x-p2[i].x))
     end
@@ -157,16 +157,17 @@ end
 @inline distance(p1::Point2D{Cartesian},p2::NamedTuple) = √((p1.x - p2.x)^2 + (p1.z - p2.z)^2)
 
 @inline distance(x1::T, z1::T, x2::T, z2::T) where {T<:Real} = √((x1-x2)^2 + (z1-z2)^2)
+
 @inline distance(p1::NTuple{2,T}, p2::NTuple{2,T}) where {T<:Real} = √((p1[1]-p2[1])^2 + (p1[2]-p2[2])^2)
 
 @inline getcentroid(p1::Point2D{T},p2::Point2D{T},p3::Point2D{T}) where T = 
     Point2D{T}((p1.x+p2.x+p3.x)/3,(p1.z+p2.z+p3.z)/3)
 
-@inline function barycentric_coordinates(bary_dummy, in, vc, pc)
+@inbounds function barycentric_coordinates(bary_dummy, in, vc, pc)
     x1,x2,x3 = vc[1].x, vc[2].x, vc[3].x
     z1,z2,z3 = vc[1].z, vc[2].z, vc[3].z
     x,z      = pc.x, pc.z
-    in       = false
+    inside   = false
 
     bary_dummy[1] = @muladd ((z2 - z3) * (x - x3) + (x3 - x2) * (z - z3)) /
         ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
@@ -183,17 +184,17 @@ end
 
     end
 
-    return bary_dummy,in
+    return bary_dummy, inside
 
-end ### END barycentric_coordinates FUNCTION ###################################
+end
 
-@inline function barycentric_coordinates2( intri, vc, pc)
+@inbounds function barycentric_coordinates2( intri, vc, pc)
     x1,x2,x3 = vc[1].x, vc[2].x, vc[3].x
     z1,z2,z3 = vc[1].z, vc[2].z, vc[3].z
     x,z = pc.x, pc.z
     intri = false
 
-    bc1,bc2,bc3 = 0.0, 0.0, 0.0
+    bc1, bc2, bc3 = 0.0, 0.0, 0.0
 
     bc1 = @muladd ((z2 - z3) * (x - x3) + (x3 - x2) * (z - z3)) /
         ((z2 - z3) * (x1 - x3) + (x3 - x2) * (z1 - z3))
@@ -211,8 +212,7 @@ end ### END barycentric_coordinates FUNCTION ###################################
 
     return bary_dummy, intri
 
-end ### END barycentric_coordinates FUNCTION ###################################
-
+end
 
 @inline function barycentric_coordinates3(vc, pc)
     # Coordinates of triangle's vertices
@@ -240,7 +240,7 @@ end
 function check_corruption!(found, particle_fields)
     np = length(particle_fields.T)
     Threads.@threads for i in 1:np 
-        @inbounds if isinf(particle_fields.T[i])   ||
+        @inbounds if isinf(particle_fields.T[i]) ||
            isinf(particle_fields.Fxx[i]) ||
            isinf(particle_fields.Fxz[i]) ||
            isinf(particle_fields.Fzx[i]) ||
@@ -261,7 +261,7 @@ function purgeparticles(particle_info, particle_weights, particle_fields, found)
     particle_info = [@inbounds particle_info[i] for i in ikeep]
     particle_weights = [@inbounds particle_weights[i] for i in ikeep]
 
-    Threads.@threads for i in eachindex(found)
+    @inbounds for i in eachindex(found)
         if ikeep[i] == false
             popat!(particle_fields.T, i)
             popat!(particle_fields.Fxx, i)
@@ -385,7 +385,7 @@ function addreject(T, F, gr, θThermal, rThermal, IC, particle_info, particle_we
 
     if !isempty(iadd)
 
-        for iel in iadd
+        @inbounds for iel in iadd
             # -- Parent element
             iparent = div(iel, 4, RoundUp)
             # Vertices of previous parent element
@@ -432,10 +432,11 @@ function addreject(T, F, gr, θThermal, rThermal, IC, particle_info, particle_we
 
                 # Deformation gradient
                 idx = view(e2n,1:6,iparent)
-                Fxxp = ip2particle([F[i][1,1] for i in idx], (@. 1/iw^2))
-                Fzzp = ip2particle([F[i][2,2] for i in idx], (@. 1/iw^2))
-                Fzxp = ip2particle([F[i][2,1] for i in idx], (@. 1/iw^2))
-                Fxzp = ip2particle([F[i][1,2] for i in idx], (@. 1/iw^2))
+                wF = @. 1/iw^2
+                Fxxp = ip2particle([F[i][1,1] for i in idx], wF)
+                Fzzp = ip2particle([F[i][2,2] for i in idx], wF)
+                Fzxp = ip2particle([F[i][2,1] for i in idx], wF)
+                Fxzp = ip2particle([F[i][1,2] for i in idx], wF)
 
                 # Temperature
                 idx = view(e2n_p1,:,iel)
@@ -473,9 +474,9 @@ function addreject(T, F, gr, θThermal, rThermal, IC, particle_info, particle_we
 
     return particle_info, particle_weights,particle_fields
 
-end ### END add_reject FUNCTION ###################################################
+end
 
-@inline function randomintriangle(vp)
+@inbounds function randomintriangle(vp)
     p, q = rand(), rand()
     if (p+q)>1
         p = 1-p
@@ -701,17 +702,26 @@ function tsearch_parallel(particle_info, particle_weights, θThermal, rThermal, 
     macro_neighbour = gr.neighbours
     θ, r = coordinates.θ, coordinates.r
 
-    # Find particles who remain within same old triangular element
+    # This greedy algorithm is not enterely balanced, it is slighlty better to break
+    # it into the three following separate balanced threaded loops
     @batch for ipart in 1:np
         # check if particle is in the same triangle as in previous time step i.e. found = true
         isinparent!(particle_info, θThermal, rThermal, vertices, found, ipart)
-        if found[ipart] == false
+    end
+    # this is the guy responsible of breaking the balanced load
+    @batch for ipart in 1:np 
+        # if found[ipart] == false
+            @inbounds found[ipart] && continue
             # check neighbour that contains new position of the particle
             isinneighbours!(particle_info, θThermal, rThermal, θ, r, vertices, ipart, found,  macro_neighbour)
-        end
+        # end
+    end
+
+    @batch for ipart in 1:np
         # fill weights information
         fillparticle!(particle_weights, particle_info, vertices, IntC, θThermal, rThermal, ipart)
     end
+
     return particle_info, particle_weights, found
 end
 
@@ -721,7 +731,7 @@ getvertices_e2n(gr::Grid, t::NTuple) =
     (x = (gr.θ[t[1]], gr.θ[t[2]], gr.θ[t[3]]), z = (gr.r[t[1]], gr.r[t[2]], gr.r[t[3]]))
 
 
-function isinparent!(particle_info, θThermal, rThermal, vertices, found, ipart)
+@inbounds function isinparent!(particle_info, θThermal, rThermal, vertices, found, ipart)
     nt = Threads.threadid()
     # -- Vertices of previous parent element
     getvertices!(vertices[nt], θThermal, rThermal, particle_info[ipart].t)
@@ -729,7 +739,7 @@ function isinparent!(particle_info, θThermal, rThermal, vertices, found, ipart)
     found[ipart] = intriangle(vertices[nt], particle_info[ipart].CPolar)
 end
 
-function isinneighbours!(particle_info, θThermal, rThermal, θ, r, vertices, ipart, found, macro_neighbour) 
+@inbounds function isinneighbours!(particle_info, θThermal, rThermal, θ, r, vertices, ipart, found, macro_neighbour) 
     nt = Threads.threadid()
 
     # check if it's still within same parent element (not included in neighbour list)
@@ -778,7 +788,7 @@ function isinneighbours!(particle_info, θThermal, rThermal, θ, r, vertices, ip
 
 end
 
-function fillparticle!(particle_weights, particle_info, vertices, IntC, θThermal, rThermal, ipart)
+@inbounds function fillparticle!(particle_weights, particle_info, vertices, IntC, θThermal, rThermal, ipart)
     nt = Threads.threadid()
     particle_info[ipart].t_parent = ceil(Int,particle_info[ipart].t/4)
     pc = particle_info[ipart].CPolar

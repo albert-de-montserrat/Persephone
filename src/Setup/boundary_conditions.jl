@@ -4,6 +4,12 @@ struct BC{T,N}
     vfix::Vector{N}
 end
 
+function init_BCs(gr, IDs; Ttop = 0.0, Tbot = 1.0, type="free slip" )
+    TBC = temperature_bcs(gr, IDs; Ttop = Ttop, Tbot =Tbot)
+    UBC = velocity_bcs(gr, IDs; type=type)
+    return TBC, UBC
+end
+
 function velocity_bcs(M::Grid, nr, ids; type="free slip")
     if type == "free slip"
         Ωu, ufix = free_slip(nr, ids)

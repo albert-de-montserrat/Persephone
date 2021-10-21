@@ -286,6 +286,11 @@ repo-url = "https://github.com/albert-de-montserrat/Fabrics.jl.git"
 uuid = "7b55d2ff-9405-43bd-b177-8809a5e3dbfc"
 version = "0.1.0"
 
+[[deps.FastClosures]]
+git-tree-sha1 = "acebe244d53ee1b461970f8910c235b259e772ef"
+uuid = "9aa1b823-49e4-5ca5-8b0f-3971ec8bab6a"
+version = "0.3.2"
+
 [[deps.FileIO]]
 deps = ["Pkg", "Requires", "UUIDs"]
 git-tree-sha1 = "3c041d2ac0a52a12a27af2782b34900d9c3ee68c"
@@ -699,6 +704,12 @@ version = "0.3.3"
 [[deps.LinearAlgebra]]
 deps = ["Libdl", "libblastrampoline_jll"]
 uuid = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
+
+[[deps.LinearOperators]]
+deps = ["FastClosures", "LinearAlgebra", "Printf", "SparseArrays", "TimerOutputs"]
+git-tree-sha1 = "699beec5330b4d0bf364ccc86d260c6de13efe6c"
+uuid = "5c8ed15e-5a4c-59e4-a42b-c7e8811fb125"
+version = "2.2.1"
 
 [[deps.LogExpFunctions]]
 deps = ["ChainRulesCore", "DocStringExtensions", "IrrationalConstants", "LinearAlgebra"]
@@ -1247,6 +1258,12 @@ version = "0.1.1"
 [[deps.Test]]
 deps = ["InteractiveUtils", "Logging", "Random", "Serialization"]
 uuid = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[[deps.ThreadedSparseArrays]]
+deps = ["LinearAlgebra", "SparseArrays"]
+git-tree-sha1 = "ea71755eca2772b4f2cefd0aa6f006634fb071c3"
+uuid = "59d54670-b8ac-4d81-ab7a-bb56233e17ab"
+version = "0.2.1"
 
 [[deps.ThreadingUtilities]]
 deps = ["ManualMemory"]

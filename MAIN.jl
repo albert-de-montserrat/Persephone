@@ -7,7 +7,7 @@ import Statistics:mean
 function main()
 
     #=========================================================================
-        INITIALISE OUTPUT PATHS:    
+        INITIALISE OUTPUT PATHS
     =========================================================================#
     iscluster = false
     if iscluster
@@ -15,49 +15,34 @@ function main()
     else
         path = "/home/albert/Desktop/output"
     end
-    folder = "No_Annealing_test"
+    folder = "FabricDestruction"
     OUT, iplot = setup_output(path, folder)
+
+    #=========================================================================
+        RELOAD CHECKPOINT    
+    =========================================================================#
+    load = false
+    iload = 108
+    i0 = 1
 
     #=========================================================================
         MAKE GRID
     =========================================================================#
-    split = 2
-    N = 4
-    if split == 1
-        nr = Int(1 + 2^N)
-        nθ = Int(12 * 2^N)
-        gr = Grid_split1(nθ, nr)
-    else
-        nr = Int(1+2^N)
-        nθ = Int(12*2^N)
-        # nr = Int(1 + 32)
-        # nθ = Int(256)
-        gr = Grid(nθ, nr)
-    end
-    IDs = point_ids(gr)
-    load = false
-
+    gr, IDs = init_grid(4; split=2) # 1st argument = N
     PhaseID = 1
-    # min_inradius = inradius(gr)
     min_inradius = inrectangle(gr)/2
-
-    nU = maximum(gr.e2n)
-    nnod = length(gr.θ)
-    P = fill(0.0, maximum(gr.e2nP))
-    U = fill(0.0, nU .* 2)
-
     GlobC = [Point2D{Polar}(gr.θ[i], gr.r[i]) for i in 1:gr.nnod] # → global coordinates
 
     #=========================================================================
         Boundary conditions
     =========================================================================#
-    TBC = temperature_bcs(gr, IDs; Ttop = 0.0, Tbot = 1.0)
-    UBC = velocity_bcs(gr, IDs; type="free slip")
-    
+    # T and U boundary conditions
+    TBC, UBC = init_BCs(gr, IDs, Ttop = 0.0, Tbot = 1.0, type="free slip" )
+
     #=========================================================================
         Delete existing statistics file    
     =========================================================================#
-    ScratchNu, stats_file  = setup_metrics(gr, path, folder)
+    ScratchNu, stats_file  = setup_metrics(gr, path, folder, load = load)
 
     #=========================================================================
         GET DEM STRUCTURE:    
@@ -86,7 +71,7 @@ function main()
     ipx, ipz = getips(gr.e2n, θ6, r6 )
     ix, iz = polar2cartesian(ipx, ipz)
     transition = 2.22-0.2276
-    # isotropic_idx = findall(ipz .> transition)
+    isotropic_idx = findall(ipz .> transition)
     IntC = [@inbounds(Point2D{Polar}(ipx[i], ipz[i])) for i in CartesianIndices(ipx)] # → ip coordinates
 
     #=========================================================================
@@ -99,9 +84,11 @@ function main()
     #=========================================================================
         ALLOCATE/INITIALISE FIELDS    
     =========================================================================#
+    # Allocate velocity and pressure fields
+    U, P = init_U_P(gr)
     # Allocate velocity gradient, stress and strain tensors:
     F, _, τ, ε,  = initstress(gr.nel)
-    FSE = [FiniteStrainEllipsoid(1.0, 0.0, 0.0, 1.0, 1.0, 1.0) for _ in 1:gr.nel, _ in 1:6]
+    # FSE = [FiniteStrainEllipsoid(1.0, 0.0, 0.0, 1.0, 1.0, 1.0) for _ in 1:gr.nel, _ in 1:6]
     # Allocate viscosity tensor:
     𝓒 = 𝓒init(gr.nel, 7)
     # Allocate nodal velocities
@@ -114,7 +101,15 @@ function main()
     init_particle_temperature!(particle_fields, particle_info, type = perturbation)
 
     # Annealing rate
-    annealing = Annealing(1e-1)
+    annealing = 1e-3
+    
+    # Finite Strain structure
+    FSE = FiniteStrain(gr.nel,
+        nip = 6, 
+        ϵ = 1e3, # a1/a2 at which fabric is destroyed
+        annealing_rate = 0, # annealing rate
+        r_iso = 0 # depth above which Ω is isotropic
+    )
 
     #= Viscosity type. Options:
         (*) "IsoviscousIsotropic"
@@ -139,7 +134,7 @@ function main()
     	# η = 1/0.6899025321942348 for anisotropic with phi = 20%
     Valη = Val(η)
     g = 1e6
-    𝓒 = anisotropic_tensor(FSE, D, Valη)
+    𝓒 = anisotropic_tensor(FSE.fse, D, Valη)
 
     #=========================================================================
         SOLVER INVARIANTS (FOR AN IMMUTABLE MESH):
@@ -154,7 +149,7 @@ function main()
 
     # Stokes immutables
     KS, GS, MS, FS, DoF_U, DoF_P, nn, SF_Stokes, ScratchStokes = stokes_immutables(
-        gr, nnod, 2, 3, 6, gr.nel, 7
+        gr, gr.nnod, 2, 3, 6, gr.nel, 7
     )
 
     SF_Stress = stress_shape_functions()
@@ -171,10 +166,12 @@ function main()
         LOAD PREVIOUS MODELS
     =========================================================================#
     if load == true
-        toreload = joinpath(pwd(), path, folder, "file_14.h5")
+        i0 = iload + 1
+        load_file = string("file_", iload, ".h5")
+        toreload = joinpath(pwd(), path, folder, load_file)
         T, F = reloader(toreload)
         FSE = getFSE(F, FSE)
-        𝓒 = anisotropic_tensor(FSE, D, Valη, ipx)
+        𝓒 = anisotropic_tensor(FSE, D, Valη)
     end
 
     #=========================================================================
@@ -184,17 +181,15 @@ function main()
     Time = 0.0
     T0 = deepcopy(T)
 
-    for iplot in 1:100
-        for _ in 1:100
+    for iplot in i0:350
+        for _ in 1:75
             reset_timer!(to)
 
             #= Update material properties =#
             state_equation!(ρ, VarT.α, T)
             getviscosity!(η, T)
 
-            #=
-                Stokes solver using preconditioned-CG
-            =#    
+            #= Stokes solver using preconditioned-CG =#    
             Ucartesian, Upolar, U, Ucart, P, to = solveStokes(
                 U,
                 P,
@@ -217,27 +212,31 @@ function main()
             );
 
             println("min:max Uθ ", extrema(@views U[1:2:end]))
-            println("mean speed  ", mean(@views @. (√(U[1:2:end]^2 + U[2:2:end]^2))))
-
-            Δt = calculate_Δt(Ucartesian, nθ, min_inradius) # adaptive time-step
+            println("mean speed ", mean(@views @. (√(U[1:2:end]^2 + U[2:2:end]^2))))
+            
+            #= Adaptive time-step =#
+            Δt = calculate_Δt(Ucartesian, gr.nθ, min_inradius)
             println("Δt = ", Δt)
-            #=
-                Stress-Strain postprocessor
-            =#
+
+            #= Stress-Strain postprocessor =#
             @timeit to "F" stress!(F, ε, Ucart, gr.nel, DoF_U, coordinates, SF_Stress, Δt)
-            εII = secondinvariant(ε)
+            # εII = secondinvariant(ε)
 
             # isotropic_lithosphere!(F, isotropic_idx)
             # F = healing(F, FSE)
-            @timeit to "FSE" FSE = getFSE(F, FSE)
+            # @timeit to "FSE" FSE = getFSE(F, FSE)
             # F0, FSE0 = deepcopy(F), deepcopy(FS)
             # @timeit to "FSE" FSE, F = getFSE_healing(F, FSE, ϵ=1e3)
             # @timeit to "FSE" getFSE_annealing!(F, FSE, annealing*(Time+Δt))
-            # F11 = [f[1,1] for f in F]
-            # iel=findall(isnan.(F11))[1]
+
+            # Finite Strain Ellipsoid calculation
+            if FSE.isotropic_domain != 0 # check whether any region of the Earth is always isotropic
+                isotropic_lithosphere!(F, isotropic_idx) # force isotropy         
+            end
+            FSE, F = getFSE(F, FSE)
 
             #= Compute the viscous tensor =#
-            @timeit to "viscous tensor" 𝓒 = anisotropic_tensor(FSE, D, Valη)
+            @timeit to "viscous tensor" 𝓒 = anisotropic_tensor(FSE.fse, D, Valη)
 
             #=
                 Diffusion solver
@@ -269,40 +268,44 @@ function main()
                     T   : node |-> particle
                     Ui  : node |-> particle + advection
                 =#
-
-                @timeit to "F → particle" particle_fields = F2particle(
-                    particle_fields, particle_info, ipx, ipz, F
-                )
-
-                @timeit to "T → particle" begin
-                    interpolate_temperature!(
-                        T0,
-                        particle_fields,
-                        gr,
-                        ρ,
-                        T,
-                        particle_info,
-                        particle_weights,
-                        VarT,
-                        nθ,
-                        nr,
-                        Δt,
-                        ΔT,
+                @sync begin
+                    
+                    @timeit to "F → particle" particle_fields = F2particle(
+                        particle_fields, particle_info, ipx, ipz, F
                     )
+
+                    @timeit to "T → particle" begin
+                        interpolate_temperature!(
+                            T0,
+                            particle_fields,
+                            gr,
+                            ρ,
+                            T,
+                            particle_info,
+                            particle_weights,
+                            VarT,
+                            gr.nθ,
+                            gr.nr,
+                            Δt,
+                            ΔT,
+                        )
+                    end
+
+                    
                 end
 
                 @timeit to "advection" particle_info, particle_weights, to = advection_RK2(
-                    particle_info,
-                    gr,
-                    particle_weights,
-                    Ucartesian,
-                    Δt,
-                    θThermal,
-                    rThermal,
-                    coordinates,
-                    IntC,
-                    to,
-                )
+                        particle_info,
+                        gr,
+                        particle_weights,
+                        Ucartesian,
+                        Δt,
+                        θThermal,
+                        rThermal,
+                        coordinates,
+                        IntC,
+                        to,
+                    )
 
                 println("Min-max particle temperature = ", extrema(particle_fields.T))
             end
@@ -372,9 +375,7 @@ function main()
             show(to; compact=true)
         end
 
-        #=
-            Save output file
-        =#
+        #= Save output file =#
         println("\n time = ", Time)
         println("\n Saving output...")
         OUT = IOs(path, folder, "file", iplot)
@@ -387,9 +388,9 @@ function main()
             𝓒,
             ρ,
             F,
-            FSE,
-            nθ, 
-            nr,
+            FSE.fse,
+            gr.nθ, 
+            gr.nr,
             particle_fields,
             particle_info,
             Time,

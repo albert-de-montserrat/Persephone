@@ -1,4 +1,4 @@
-function _MKLfactorize(KK:: SparseMatrixCSC,Rhs::Vector,ifree::Vector; verbose = false)
+function _MKLfactorize(KK, Rhs::Vector,ifree::Vector; verbose = false)
     
     A  = KK[ifree,ifree]
     B  = Rhs[ifree]
@@ -32,7 +32,7 @@ function _MKLfactorize(KK:: SparseMatrixCSC,Rhs::Vector,ifree::Vector; verbose =
 
 end 
 
-function _MKLsolve!(T::Vector, A_pardiso::SparseMatrixCSC, ps::MKLPardisoSolver, Rhs::Vector{Float64}, ifree::Vector{Int64})
+function _MKLsolve!(T::Vector, A_pardiso, ps::MKLPardisoSolver, Rhs::Vector{Float64}, ifree::Vector{Int64})
     
     B = Rhs[ifree]
     X = similar(B)
@@ -113,7 +113,7 @@ end # END PARDISO SOLVER N.1
 
 
 # PARDISO SOLVER N.2 ================================================================
-function _MKLpardiso(A::SparseMatrixCSC, B::Vector{Float64})
+function _MKLpardiso(A, B::Vector{Float64})
     
     # Allocate solution vector
     X  = similar(B)
@@ -246,7 +246,7 @@ Solve Symmetric Positive Definite system of eqs using via CHOLESKY factorization
 in the un-constrained elements of the solution array containing allocated boundary conditions. Return 
 solution T and factorization F
 """
-@inline function _CholeskyFactorizationSolve(T::Vector{Float64},KK::SparseMatrixCSC,Rhs::Vector{Float64},ifree::Vector{Int64})
+@inline function _CholeskyFactorizationSolve(T::Vector{Float64},KK,Rhs::Vector{Float64},ifree::Vector{Int64})
     K = KK[ifree,ifree]
     # F = cholesky((K')')
     # F = factorize((K')')
@@ -258,7 +258,7 @@ end
 Solve Symmetric Positive Definite system of eqs using via CHOLESKY factorization. Return 
 solution T and factorization F
 """
-@inline function _CholeskyFactorizationSolve(KK:: SparseMatrixCSC,Rhs::Vector{Float64})
+@inline function _CholeskyFactorizationSolve(KK, Rhs::Vector{Float64})
     A = KK[ifree,ifree]
     # F = cholesky((A')')
     F = factorize((A')')

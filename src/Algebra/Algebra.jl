@@ -64,6 +64,9 @@ function xpy!(y::Vector{T}, x::Vector{T}, p::T) where T
     end
 end
 
+# x + p*y -> y (vec+scalar*vec)
+# xpy(y::CuArray, x::CuArray, p::Number) = x .+ p .* y
+
 # out-of-place Sparse CSC matrix times dense vector
 function spmv(A::AbstractSparseMatrix, x::DenseVector)
     out = zeros(eltype(x), A.m)

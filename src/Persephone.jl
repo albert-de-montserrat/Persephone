@@ -14,12 +14,16 @@ using Pardiso
 using Fabrics
 using MuladdMacro
 using Krylov
-using MKLSparse
+using ThreadedSparseArrays
+using LimitedLDLFactorizations
+# using CUDA, CUDA.CUSPARSE
 
 import Statistics: mean
 import .Base:*
 
 # LinearAlgebra.BLAS.set_num_threads(1)
+# include("GPUsolver.jl")
+# export StokesPcCG_gpu
 
 include("Grid/mesher.jl")
 export Grid_split1
@@ -33,6 +37,7 @@ export Cartesian
 export Polar
 export Point2D
 export ElementCoordinates
+export init_grid
 
 include("Grid/coloring.jl")
 export color_mesh
@@ -75,6 +80,9 @@ export getFSE_annealing!
 export rebuild_FSE
 export isotropic_lithosphere!
 export healing
+export FiniteStrain
+export Annealing
+
 
 include("IterativeSolvers.jl")
 
@@ -119,6 +127,7 @@ export thermal_parameters
 export init_temperature
 export init_particle_temperature!
 export fixT!
+export init_U_P
 
 include("Rheology/anisotropy.jl")
 export StiffnessTensor
@@ -171,8 +180,9 @@ export stress_shape_functions
 
 include("Setup/boundary_conditions.jl")
 export BC
-export velocity_bcs
-export temperature_bcs
+export init_BCs
+# export velocity_bcs
+# export temperature_bcs
 
 include("PiC/CubicInterpolations.jl")
 export quasicubic_interpolation
@@ -185,7 +195,8 @@ export secondinvariant
 export stress!
 export stress
 
-include("Stress/Annealing.jl")
-export Annealing
+# include("Stress/Healing.jl")
+# export FiniteStrain
+# export Annealing
 
 end # module

@@ -10,31 +10,36 @@ function StokesPcCG_pardiso(U, P, KK, MM, GG, Rhs, ifree)
     # fill!(P, 0.0)
     nU = length(Rhs) 
     z = fill(0.0, nU)
+    y = Vector{Float64}(undef, GG.m)
+    Sq = Vector{Float64}(undef, GG.n)
     
     # forces resulting from pressure gradients
-    Rhs += spmv(GG, P)
+    # Rhs += spmv(GG, P)
+    Rhs .+= GG*P
 
     # guess of the velocity field 
     ps, A_pardiso = _MKLfactorize(KK, Rhs, ifree)
     _MKLsolve!(U, A_pardiso, ps, Rhs, ifree)
 
     # initial pressure residual vector
-    GGtransp = sparse(GG')
-    r = -GGtransp *U  
+    GGtransp = GG'
+    r = -GGtransp * U 
     rm0space!(r)
     Prms = mynorm(r) # norm of r_i
     tol = Prms * rtol_Pat
+
     # get preconditioner
-    MM, pc = _preconditioner("jacobi", MM)
-    # MM, pc = _preconditioner("lumped", MM)
-    
+    # MM, pc = _preconditioner(:jacobi, MM)
+    MM, pc = _preconditioner(:incomplete_chol, MM)
+    # pc = AMGPreconditioner{RugeStuben}(MM)
+    d = pc\r # precondition residual
+
     # Begin of Patera pressure iterations 
     # d = _precondition(pc, MM, r) # precondition residual
-    d = _precondition(pc, r) # precondition residual
+    # d = _precondition(pc, r) # precondition residual
     q = deepcopy(d)  # define FIRST search direction q
-    y = Vector{Float64}(undef, size(GG, 1))
-    Sq = Vector{Float64}(undef, size(GGtransp, 1))
     rlast = similar(r)
+
     for itPat = 1:itmax_Pat
         itnum +=1
 
@@ -68,15 +73,15 @@ function StokesPcCG_pardiso(U, P, KK, MM, GG, Rhs, ifree)
         rm0space!(r)
 
         # Check convergence 
-        Prrms = mynorm(r)
-        if Prrms < tol && itPat>=itmin_Pat
+        if mynorm(r) < tol && itPat>=itmin_Pat
             println("\n", itnum," CG iterations\n")
             break
         end
 
         # fill!(z, 0.0)
 
-        d  = _precondition(pc, r) # precondition residual
+        d = pc\r # precondition residual
+        # d  = _precondition(pc, r) # precondition residual
         # Make new search direction q S-orthogonal to all previous q's
         β  = mydot(r-rlast,d)/rd # Polak-Ribiere version 1        
         xpy!(q, d, β)
@@ -103,7 +108,8 @@ function StokesPcCG(U,P,KK,MM,GG,Rhs,ifree)
     z = fill(0.0, nU)
     
     # forces resulting from pressure gradients
-    Rhs += spmv(GG, P)
+    # Rhs += spmv(GG, P)
+    Rhs += GG*P
 
     # guess of the velocity field 
     U,F = _CholeskyFactorizationSolve(U, KK, Rhs, ifree) # return factorization F to speed up next direct solvers
@@ -115,7 +121,7 @@ function StokesPcCG(U,P,KK,MM,GG,Rhs,ifree)
     Prms = mynorm(r) # norm of r_i
     tol = Prms * rtol_Pat
     # get preconditioner
-    MM, pc = _preconditioner("jacobi", MM)
+    MM, pc = _preconditioner(:jacobi, MM)
     # MM, pc = _preconditioner("lumped", MM)
     
     # Begin of Patera pressure iterations 
@@ -137,7 +143,7 @@ function StokesPcCG(U,P,KK,MM,GG,Rhs,ifree)
             (2) K z = y
             (3) Sq  = Gᵀ*z
         =============================================================#
-        y = spmv(GG, q) # (1) y   = G*q
+        y = GG * q # (1) y   = G*q
         _CholeskyWithFactorization!(z, F, y, ifree) # (2) Solve K z = y
         Sq = GGtransp*z # (3) Sq  = G'*z
         #=============================================================#
@@ -151,8 +157,7 @@ function StokesPcCG(U,P,KK,MM,GG,Rhs,ifree)
         rm0space!(r)
 
         # Check convergence 
-        Prrms = mynorm(r)
-        if Prrms < tol && itPat>=itmin_Pat
+        if mynorm(r) < tol && itPat>=itmin_Pat
             println("\n", itnum," CG iterations\n")
             break
         end
@@ -188,36 +193,62 @@ end
 
 # PRECONDITIONERS ================================================================
 @inline function _preconditioner(type, MM)
-    if type == "diagonal"
+
+    MM = MM .+ tril(MM,-1)' 
+
+    if type == :diagonal
         #=
             Inverse of the diagonal of the mass matrix scaled by viscosity
         =#
-        MM, C = diagonalpreconditioner(MM)
+        p = diagonalpreconditioner(MM)
 
-    elseif type == "lumped"
+    elseif type == :lumped
         #=
             Inverse of lumped mass matrix scaled by viscosity
         =#        
-        MM, C  = lumpedpreconditioner(MM)
+        p  = lumpedpreconditioner(MM)
 
-    elseif type == "jacobi"
+    elseif type == :jacobi
         #=
             Inverse of lumped mass matrix scaled by viscosity
         =#        
-        MM, C  = lumpedpreconditioner(MM)
+        p  = lumpedpreconditioner(MM)
+
+    elseif type == :incomplete_chol
+        #=
+            Inverse of lumped mass matrix scaled by viscosity
+        =#        
+        p  = lltpreconditioner(MM)
     end
-    return MM, C
+    return MM, p
 end # END OF PRECONDITIONERS
 
+struct DiagonalPreconditioner{T}
+    p::T
+end
+
+function invdiagsp(A::SparseMatrixCSC{Tv,Ti}) where {Tv,Ti}
+    si, sj = A.m, A.n
+    @assert si == sj 
+    I = collect(1:si)
+    d = Vector{Tv}(undef, si)
+    Threads.@threads for i in I
+        @inbounds d[i] = 1/A[i,i]
+    end
+    sparse(I, I, d)
+end
+
 @inline function diagonalpreconditioner(MM)
-    MM = MM .+ tril(MM,-1)'
-    return MM, inv(diagm(MM))
-end  
+    return (invdiagsp(MM))
+end
 
 @inline function lumpedpreconditioner(MM)
-    MM = MM .+ tril(MM,-1)'
-    return MM, dropdims(sum(MM,dims=2), dims=2).^-1
-end  
+    return dropdims(sum(MM,dims=2), dims=2).^-1
+end
+
+@inline function lltpreconditioner(MM)
+    return lldl(MM)
+end
 
 @inline function _updatesolution!(P,U,r,q,z,Sq,α)
     n1 = length(P)

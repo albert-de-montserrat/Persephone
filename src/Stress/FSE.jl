@@ -1,3 +1,11 @@
+abstract type Healing end
+abstract type NoHealing <: Healing end
+abstract type AnnealingOnly <: Healing end
+abstract type IsotropicDomainOnly <: Healing end
+abstract type AnnealingIsotropicDomain <: Healing end
+abstract type FabricDestructionOnly <: Healing end
+abstract type AnnealingFabricDestruction <: Healing end
+
 struct FiniteStrainEllipsoid{T}
     x1::T
     x2::T
@@ -7,9 +15,61 @@ struct FiniteStrainEllipsoid{T}
     a2::T
 end
 
+# Define isotropic domain
+struct IsotropicDomain{T}
+    r::T  # depth above which Ω is isotropic
+end
+
+# Rate of annealing
+struct Annealing{T}
+    rate::T # rate of annealing
+end
+
+# Destruction of fabric
+struct FabricDestruction{T}
+    ϵ::T # ratio a1/a2 at which aggregate goes back to its anisotropic form
+end
+
+struct FiniteStrain{T} <: Healing
+    fse::Matrix{FiniteStrainEllipsoid{Float64}} # matrix containing the FSE at every ip
+    annealing::Annealing # rate of annealing
+    destruction::FabricDestruction # ratio a1/a2 at which aggregate goes back to its anisotropic form
+    isotropic_domain::IsotropicDomain # depth above which Ω is isotropic
+
+    function FiniteStrain(nel; nip = 6, ϵ = 1e3, annealing_rate = 0, r_iso = 0)
+        # instantiate isotropic finite strain ellipsoid
+        fse = [FiniteStrainEllipsoid(1.0, 0.0, 0.0, 1.0, 1.0, 1.0) for _ in 1:nel, _ in 1:nip]
+        # define active healing mechanism(s)
+        if (annealing_rate != 0) && (ϵ != 0)
+            type = AnnealingFabricDestruction
+
+        elseif (annealing_rate != 0) && (ϵ == 0)
+            type = AnnealingOnly
+
+        elseif (annealing_rate == 0) && (ϵ != 0)
+            type = FabricDestructionOnly
+
+        else
+            type = NoHealing
+        
+        end
+        # create object
+        new{type}(
+            fse,
+            Annealing(annealing_rate),
+            FabricDestruction(ϵ),
+            IsotropicDomain(r_iso)
+        )
+
+    end
+end
+
+*(a::Number, annealing::Annealing) = a*annealing.rate
+*(annealing::Annealing, a::Number) = a*annealing.rate
+
 rebuild_FSE(vx1, vx2, vy1, vy2, a1, a2) = [FiniteStrainEllipsoid(vx1[i], vx2[i], vy1[i], vy2[i], a1[i], a2[i]) for i in CartesianIndices(a1)]
 
-function isotropic_lithosphere!(F,idx)
+function isotropic_lithosphere!(F, idx)
     Is = @SMatrix [1.0 0.0; 0.0 1.0]
     Threads.@threads for i in idx
         @inbounds F[i] = Is
@@ -26,37 +86,16 @@ function healing(F, FSE)
     return F
 end
 
-
-function normalize_F!(F; ϵ = 1e50)
-    normalizer = abs(maximum(F[1])) # make sure we take the absolute value, don't want to change signs
-    order = log10(normalizer) # need to check only one component, as the rest will havea similar exponent
-    if order > ϵ
-        normalizer = 1/normalizer
-        Threads.@threads for i in eachindex(F)
-            @inbounds @fastmath F[i] .*= normalizer
-        end
-    end
-end
-
-function normalize_F(F; ϵ = 1e30)
-    Fmax = abs(maximum(F)) # take absolute value because we do not want to change the sign of Fij
-    if Fmax > ϵ
-        return F./Fmax
-    else 
-        return F
-    end
-end
-
-function getFSE(F, FSE)
+function getFSE(F, FSE::FiniteStrain{NoHealing})
     # F can grow A LOT in long computations, eventually overflowing at ~1e309
     # Thus we need to normalize F from time to time. We normalize F ∈ Ω w.r.t.
     # the same number (max(F[1])), otherwise a heterogeneous normalization 
     # will screw up the particles interpolation 
     normalize_F!(F) 
     Threads.@threads for iel in CartesianIndices(F)
-        @inbounds FSE[iel] = _FSE(F[iel])
+        @inbounds FSE.fse[iel] = _FSE(F[iel])
     end
-    FSE
+    FSE, F
 end 
 
 function _FSE(Fi)
@@ -81,20 +120,40 @@ function _FSE(Fi)
 
 end
 
+function normalize_F!(F; ϵ = 1e50)
+    normalizer = abs(maximum(F[1])) # make sure we take the absolute value, don't want to change signs
+    order = log10(normalizer) # need to check only one component, as the rest will havea similar exponent
+    if order > ϵ
+        normalizer = 1/normalizer
+        Threads.@threads for i in eachindex(F)
+            @inbounds @fastmath F[i] .*= normalizer
+        end
+    end
+end
+
+function normalize_F(F; ϵ = 1e30)
+    Fmax = abs(maximum(F)) # take absolute value because we do not want to change the sign of Fij
+    if Fmax > ϵ
+        return F./Fmax
+    else 
+        return F
+    end
+end
+
 eigval_order(eigval) = ifelse(
     @inbounds(eigval[2] > eigval[1]),
     (2, 1),
     (1, 2)
 )
 
-function getFSE_healing(F, FSE; ϵ = 1e3)
+function getFSE(F, FSE::FiniteStrain{FabricDestructionOnly})
     Threads.@threads for iel in eachindex(F)
-        healing_FSE!(FSE, F, iel, ϵ)
+        healing_FSE!(FSE, F, iel)
     end
-    FSE, F
+    return FSE, F
 end 
 
-function healing_FSE!(FSE, F, iel, ϵ)
+@inbounds function healing_FSE!(FSE, F, iel)
     
     # Compute FSE
     Fi = normalize_F(F[iel]) # normalize F if its too big, otherwise F*F' will be Inf
@@ -103,9 +162,9 @@ function healing_FSE!(FSE, F, iel, ϵ)
 
     a1 = √(abs(eigval[imax]))
     a2 = √(abs(eigval[imin]))
-    @inbounds if a1/a2 < ϵ
+    @inbounds if a1/a2 < FSE.destruction.ϵ
         # Fill FSE
-        FSE[iel] = FiniteStrainEllipsoid(
+        FSE.fse[iel] = FiniteStrainEllipsoid(
             evect[1,imax]::Float64, # vx1
             evect[1,imin]::Float64, # vx2
             evect[2,imax]::Float64, # vy1
@@ -115,9 +174,10 @@ function healing_FSE!(FSE, F, iel, ϵ)
         )
 
     else
+        # destruction of the fabric -> isotropic aggregate
         F[iel] = @SMatrix [1.0 0.0; 0.0 1.0]
         # Fill FSE
-        FSE[iel] = FiniteStrainEllipsoid(
+        FSE.fse[iel] = FiniteStrainEllipsoid(
             1.0, # vx1
             0.0, # vx2
             0.0, # vy1
@@ -130,16 +190,15 @@ function healing_FSE!(FSE, F, iel, ϵ)
 
 end
 
-function getFSE_annealing!(F, FSE, annealing)
+function getFSE(F, FSE::FiniteStrain{AnnealingOnly})
+    annealing = FSE.annealing.rate
     Threads.@threads for iel in eachindex(F)
-        @inbounds FSE[iel] = _FSE_annealing(F[iel], annealing)
+        @inbounds FSE.fse[iel] = _FSE_annealing(F[iel], annealing)
     end
+    return FSE, F
 end
 
-function _FSE_annealing(
-    F, 
-    s
-)
+@inbounds function _FSE_annealing(F, s)
     
     # Compute FSE
     Fi = normalize_F(F) # normalize F if its too big, otherwise F*F' will be Inf
@@ -172,11 +231,123 @@ function _FSE_annealing(
 
 end
 
+function getFSE(F, FSE::FiniteStrain{AnnealingFabricDestruction})
+    # F can grow A LOT in long computations, eventually overflowing at ~1e309
+    # Thus we need to normalize F from time to time. We normalize F ∈ Ω w.r.t.
+    # the same number (max(F[1])), otherwise a heterogeneous normalization 
+    # will screw up the particles interpolation 
+    normalize_F!(F) 
+    Threads.@threads for iel in CartesianIndices(F)
+        @inbounds FSE.fse[iel], F[iel] = _FSE(F[iel], FSE.destruction, FSE.annealing)
+    end
+    return FSE, F
+end
+
+
+function _FSE(F, destruction::FabricDestruction, annealing::Annealing)
+    
+    ϵ, s = destruction.ϵ, annealing.rate
+
+    # Compute FSE
+    Fi = normalize_F(F) # normalize F if its too big, otherwise F*F' will be Inf
+    L = Fi * Fi' # left-strecth tensor
+    # eigval, evect = eigen(Fi * Fi') # get length of FSE semi-axes and orientation
+    # imax, imin = eigval_order(eigval) # get the right order of the semi-axis length
+    eigval, evect, imax, imin = _eigen(L) # get length of FSE semi-axes and orientation
+                                          # and the right order of eigvals and eigvects
+                                        
+    # principal semi-axes
+    a1, a2 = √(abs(eigval[imax])),  √(abs(eigval[imin]))
+    # eigenvectors
+    λ11, λ12, λ21, λ22 = evect[1,imax], evect[2,imax], evect[1,imin], evect[2,imin]
+    # unstretch semi-axes due to annealing
+    a1u, a2u = unstretch_axes(a1, a2, s)
+    # Fu = recover_F(Fi, L, λ11, λ12, λ21, λ22, a1u, a2u)
+    # Fu = recover_F(Fi, L, λ11, λ12, λ21, λ22, a1, a2)
+
+    if a1u/a2u < ϵ # check whether fabric is destroyed or not
+        # Fill FSE
+        FSE = FiniteStrainEllipsoid(
+            λ11, # vx1
+            λ21, # vx2
+            λ12, # vy1
+            λ22, # vy2
+            a1u, 
+            a2u,
+        )
+
+    else
+        # destruction of the fabric -> isotropic aggregate
+        F = @SMatrix [1.0 0.0; 0.0 1.0]
+        # Fill FSE
+        FSE = FiniteStrainEllipsoid(
+            1.0, # vx1
+            0.0, # vx2
+            0.0, # vy1
+            1.0, # vy2
+            1.0, # a1 
+            1.0, # a2
+        )
+
+    end
+
+    return FSE, F
+
+end
+
 function _eigen(A)
     eigval::SVector{2, Float64}, evect::SMatrix{2, 2, Float64} = eigen(A) # get length of FSE semi-axes and orientation
     # eigval, evect = eigen(A) # get length of FSE semi-axes and orientation
     imax, imin = eigval_order(eigval) # get the right order of the semi-axis length
     return eigval, evect, imax, imin
+end
+
+#=
+Unstrecth the FSE semi-axes by a factor of s.
+The area of the ellipse must remain the same
+after unstretching
+=#
+function unstretch_axes(a1, a2, s)
+    # a2, a1 are the old semiaxes; s is the unstretching factor
+    r0 = a2/a1 # old ratio 
+    r = r0 + (1-r0)*s # new aspect ratio
+    A = π*a2*a1 # Area of the FSE
+    # find new unstrecthed axes such that the   
+    # aspect ratio is r and A remains untouched
+    a1u = √(A/(π*r))
+    a2u = r*a1u
+
+    return a1u, a2u
+end
+
+#=
+Recover the new F tensor after unstretching the FSE semi-axes.
+We know that F = LR, where L is the left-stretch tensor and R⁻¹=Rᵀ 
+is the orthogonal rotation tensor. First we recover the new L using
+the old eigenvalues (we do not want to rotate the FSE, only unstretch 
+it) and new eigenvalues:
+    L = PDP⁻¹
+where P = [λ₁ λ₃ λ₃] and D = I⋅[a₁ a₃ a₃]ᵀ. R is obtained using the 
+old F and L0 tensors:
+    R = F\L0
+and finally we obtain the new deformation gradient tensor:
+    Fn = LR
+=#
+function recover_F(F, L0, λ11, λ12, λ21, λ22, a1, a2)
+    P = @SMatrix [
+        λ11 λ21
+        λ12 λ22
+    ]
+    D = @SMatrix [
+        a1*a1  0.0
+        0.0    a2*a2
+    ]
+    # recover left-stretch tensor 
+    L = P*D\P
+    # rotation tensor R = F\(F*Fᵀ) = F\l0
+    R = F\L0
+    # unstretched tensor of deformation
+    Fu = L*R
 end
 
 function volume_integral(V, EL2NOD, θ, r)

@@ -14,6 +14,8 @@ struct Grid{A,B,C,D}
     e2n::B
     e2n_p1::B
     e2nP::B
+    nθ::C
+    nr::C
     nel::C
     nnod::C
     nVnod::C
@@ -28,7 +30,25 @@ struct ElementCoordinates{T}
 end
 
 cartesian2polar(x,z) = (atan(x,z), sqrt(x^2+z^2))
+
 polar2cartesian(x,z) = (z*sin(x), z*cos(x))
+
+function init_grid(N; split=1)
+    if split == 1
+        nr = Int(1 + 2^N)
+        nθ = Int(12 * 2^N)
+        gr = Grid_split1(nθ, nr)
+    else
+        nr = Int(1+2^N)
+        nθ = Int(12*2^N)
+        # nr = Int(1 + 32)
+        # nθ = Int(256)
+        gr = Grid(nθ, nr)
+    end
+    IDs = point_ids(gr)
+
+    return gr, IDs
+end
 
 function Grid(nθ::Int64, nr::Int64; r_out=2.22, r_in=1.22)
     
@@ -113,6 +133,8 @@ function Grid(nθ::Int64, nr::Int64; r_out=2.22, r_in=1.22)
         EL2NOD,
         EL2NOD_P1,
         EL2NODP,
+        nθ,
+        nr,
         nel,
         nnod,
         nVnod,
@@ -194,6 +216,8 @@ function Grid_split1(nθ::Int64, nr::Int64)
         EL2NOD,
         EL2NOD_P1,
         EL2NODP,
+        nθ,
+        nr,
         nel,
         nnod,
         nVnod,

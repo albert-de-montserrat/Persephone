@@ -211,10 +211,10 @@ function load_particles(fname)
     return px, pz
 end
 
-function setup_metrics(gr, path, folder)
+function setup_metrics(gr, path, folder; load = false)
     ScratchNu = ScratchNusselt(gr)
     stats_file = joinpath(pwd(), path, folder, "statistics.txt")
-    if isfile(stats_file)
+    if !load && isfile(stats_file)
         rm(stats_file)
     end
     return ScratchNu, stats_file
