@@ -10,7 +10,7 @@ using Preconditioners
 using HDF5
 using TimerOutputs
 using Polyester
-using Pardiso
+# using Pardiso
 using Fabrics
 using MuladdMacro
 using Krylov
@@ -83,10 +83,9 @@ export healing
 export FiniteStrain
 export Annealing
 
-
 include("IterativeSolvers.jl")
 
-include("PardisoSolvers.jl")
+# include("PardisoSolvers.jl")
 
 include("Utilities.jl")
 export elementcoordinate
