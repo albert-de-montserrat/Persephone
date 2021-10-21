@@ -85,7 +85,7 @@ export Annealing
 
 include("IterativeSolvers.jl")
 
-# include("PardisoSolvers.jl")
+include("PardisoSolvers.jl")
 
 include("Utilities.jl")
 export elementcoordinate
