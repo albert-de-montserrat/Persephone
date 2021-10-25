@@ -120,13 +120,13 @@ function _FSE(Fi)
 
 end
 
-function normalize_F!(F; ϵ = 1e50)
+function normalize_F!(F; ϵ = 1e30)
     normalizer = abs(maximum(F[1])) # make sure we take the absolute value, don't want to change signs
-    order = log10(normalizer) # need to check only one component, as the rest will havea similar exponent
-    if order > ϵ
+                                    # need to check only one component, as the rest will havea similar exponent
+    if normalizer > ϵ
         normalizer = 1/normalizer
         Threads.@threads for i in eachindex(F)
-            @inbounds @fastmath F[i] .*= normalizer
+            @inbounds @fastmath F[i] *= normalizer
         end
     end
 end

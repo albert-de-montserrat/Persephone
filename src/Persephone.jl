@@ -10,7 +10,7 @@ using Preconditioners
 using HDF5
 using TimerOutputs
 using Polyester
-# using Pardiso
+using Pardiso
 using Fabrics
 using MuladdMacro
 using Krylov

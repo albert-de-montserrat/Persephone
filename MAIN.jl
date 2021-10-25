@@ -15,14 +15,14 @@ function main()
     else
         path = "/home/albert/Desktop/output"
     end
-    folder = "FabricDestruction"
+    folder = "NoHealingTrue"
     OUT, iplot = setup_output(path, folder)
 
     #=========================================================================
         RELOAD CHECKPOINT    
     =========================================================================#
     load = false
-    iload = 108
+    iload = 131
     i0 = 1
 
     #=========================================================================
@@ -106,7 +106,7 @@ function main()
     # Finite Strain structure
     FSE = FiniteStrain(gr.nel,
         nip = 6, 
-        ϵ = 1e3, # a1/a2 at which fabric is destroyed
+        ϵ = 0, # a1/a2 at which fabric is destroyed
         annealing_rate = 0, # annealing rate
         r_iso = 0 # depth above which Ω is isotropic
     )
@@ -170,8 +170,8 @@ function main()
         load_file = string("file_", iload, ".h5")
         toreload = joinpath(pwd(), path, folder, load_file)
         T, F = reloader(toreload)
-        FSE = getFSE(F, FSE)
-        𝓒 = anisotropic_tensor(FSE, D, Valη)
+        FSE, F = getFSE(F, FSE)
+        𝓒 = anisotropic_tensor(FSE.fse, D, Valη)
     end
 
     #=========================================================================
