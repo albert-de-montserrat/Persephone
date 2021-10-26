@@ -41,8 +41,10 @@ function init_grid(N; split=1)
     else
         nr = Int(1+2^N)
         nθ = Int(12*2^N)
-        # nr = Int(1 + 32)
-        # nθ = Int(256)
+        if N == 5
+            nr = Int(1 + 32)
+            nθ = Int(256)
+        end
         gr = Grid(nθ, nr)
     end
     IDs = point_ids(gr)
