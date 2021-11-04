@@ -65,7 +65,7 @@ struct FiniteStrain{T} <: Healing
 end
 
 *(a::Number, annealing::Annealing) = a*annealing.rate
-*(annealing::Annealing, a::Number) = a*annealing.rate
+*(annealing::Annealing, a::Number) = a*annealing
 
 rebuild_FSE(vx1, vx2, vy1, vy2, a1, a2) = [FiniteStrainEllipsoid(vx1[i], vx2[i], vy1[i], vy2[i], a1[i], a2[i]) for i in CartesianIndices(a1)]
 
@@ -217,6 +217,9 @@ end
     # Fu = recover_F(Fi, L, λ11, λ12, λ21, λ22, a1u, a2u)
     # Fu = recover_F(Fi, L, λ11, λ12, λ21, λ22, a1, a2)
 
+    # force isotropy in case we unstretched too much
+    a1u, a2u = force_isotropy(a1, a2)
+
     # Fill FSE
     FSE = FiniteStrainEllipsoid(
         λ11, # vx1
@@ -231,6 +234,14 @@ end
 
 end
 
+function force_isotropy(a1::T, a2::T) where T
+    if (a1 ≤ 1) || (a2 ≥ 1)
+        a1 = one(T)
+        a2 = zero(T)
+    end
+    return a1, a2
+end
+                
 function getFSE(F, FSE::FiniteStrain{AnnealingFabricDestruction})
     # F can grow A LOT in long computations, eventually overflowing at ~1e309
     # Thus we need to normalize F from time to time. We normalize F ∈ Ω w.r.t.
@@ -262,9 +273,9 @@ function _FSE(F, destruction::FabricDestruction, annealing::Annealing)
     λ11, λ12, λ21, λ22 = evect[1,imax], evect[2,imax], evect[1,imin], evect[2,imin]
     # unstretch semi-axes due to annealing
     a1u, a2u = unstretch_axes(a1, a2, s)
-    # Fu = recover_F(Fi, L, λ11, λ12, λ21, λ22, a1u, a2u)
-    # Fu = recover_F(Fi, L, λ11, λ12, λ21, λ22, a1, a2)
-
+    # force isotropy in case we unstretched too much
+    a1u, a2u = force_isotropy(a1, a2)
+                    
     if a1u/a2u < ϵ # check whether fabric is destroyed or not
         # Fill FSE
         FSE = FiniteStrainEllipsoid(
