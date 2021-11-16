@@ -241,11 +241,7 @@ function force_isotropy(a1::T, a2::T) where T
     end
     return a1, a2
 end
-<<<<<<< HEAD
 
-=======
-                
->>>>>>> d532518a632daaa3c3d94aea1069a10027a93a0b
 function getFSE(F, FSE::FiniteStrain{AnnealingFabricDestruction})
     # F can grow A LOT in long computations, eventually overflowing at ~1e309
     # Thus we need to normalize F from time to time. We normalize F ∈ Ω w.r.t.
