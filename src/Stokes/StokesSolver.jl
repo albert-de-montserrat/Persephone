@@ -4,7 +4,67 @@ struct RotationMatrix{T}
 end
 
 # ==================================================================================================================
-function solveStokes(U, P, gr, Ucartesian,Upolar, g, ρ, η, 𝓒,
+function solveStokes(U, P, gr, Ucartesian,Upolar, g, ρ, 
+    η, 𝓒, τ, ε, εII, 
+    F, DoF_U, 
+    coordinates, RotationMatrices,
+    PhaseID, UBC, SF_Stress,
+    KKidx, GGidx, MMidx, Δt,
+    to;
+    solver = :pardiso)
+
+    ∂Ωu = UBC.Ω
+    ufix = UBC.vfix
+    ifree = UBC.ifree
+
+    # Picard variables
+    max_it = 1
+    tol = 1e-3
+
+    @timeit to "Stokes" begin
+
+        U0 = deepcopy(U)
+
+        for it in 1:max_it
+            @show mean(η.ip)
+            KK,GG,MM,Rhs =
+                assembly_stokes_cylindric(gr, coordinates, g, ρ, η, 𝓒, εII, PhaseID, KKidx, GGidx, MMidx)
+
+            KK,GG,Rhs = _prepare_matrices(KK, GG, Rhs, RotationMatrices)
+            U, Rhs = _apply_bcs(U,KK,Rhs,∂Ωu,ufix)
+
+            if solver == :pardiso    
+                @timeit to "PCG solver" U, P = StokesPcCG_pardiso(U, P, KK, MM, GG, Rhs, ifree)
+
+            elseif solver == :suitesparse    
+                @timeit to "PCG solver" U, P = StokesPcCG(U, P, KK, MM, GG, Rhs, ifree)
+            
+            end    
+            
+            U, Ucart, Upolar, Ucartesian = 
+                updatevelocity2(U, Ucartesian, Upolar, ρ, RotationMatrices.TT, coordinates, gr)
+
+            stress!(F, ε, εII, τ, η, Ucart, gr.e2n, gr.nel, DoF_U, coordinates, SF_Stress, Δt)
+            
+            err = mynorm(U .- U0)/mynorm(U0)
+            println("Velocity error = $err")
+            println("Mean velocity = $(mean(U))")
+
+            if err ≤ tol
+                println("Picard iterations converged after $it iterations")
+                break
+            end
+
+            U0 .= deepcopy(U)
+        end
+    end
+
+    return Ucartesian, Upolar, U, P, ε, to
+end
+# ==================================================================================================================
+
+# ==================================================================================================================
+function solveStokes(U, P, gr, Ucartesian,Upolar, g, ρ, η, 𝓒, εII, 
     coordinates, RotationMatrices,
     PhaseID, UBC,
     KKidx,GGidx,MMidx,
@@ -17,14 +77,14 @@ function solveStokes(U, P, gr, Ucartesian,Upolar, g, ρ, η, 𝓒,
     
     @timeit to "Stokes" begin
         KK,GG,MM,Rhs =
-           assembly_stokes_cylindric(gr, coordinates, g, ρ, η, 𝓒, PhaseID, KKidx, GGidx, MMidx)
+           assembly_stokes_cylindric(gr, coordinates, g, ρ, η, 𝓒, εII, PhaseID, KKidx, GGidx, MMidx)
 
         KK,GG,Rhs = _prepare_matrices(KK, GG, Rhs, RotationMatrices)
         U,Rhs = _apply_bcs(U,KK,Rhs,∂Ωu,ufix)
 
         if solver == :pardiso    
             @timeit to "PCG solver" U, P = StokesPcCG_pardiso(U, P, KK, MM, GG, Rhs, ifree)
-            # @timeit to "PCG solver" U, P = StokesPcCG_gpu(U, P, KK, MM, GG, Rhs, ifree)
+
         elseif solver == :suitesparse    
             @timeit to "PCG solver" U, P = StokesPcCG(U, P, KK, MM, GG, Rhs, ifree)
         end    
@@ -229,14 +289,14 @@ end
         # KK1_T[i2]      = sint # element (2,1) in the rotation matrix [TT] 
     end
     
-    TT = ThreadedSparseMatrixCSC(sparse(KKi_T,KKj_T,KK1_T))
-    transTT = ThreadedSparseMatrixCSC(SparseMatrixCSC(TT'))
+    TT = sparse(KKi_T,KKj_T,KK1_T)
+    transTT = SparseMatrixCSC(TT')
     
     return RotationMatrix(TT, transTT)
 
 end
 
-function assembly_stokes_cylindric(gr, coordinates, g, ρ, η, 𝓒, PhaseID,KKidx,GGidx,MMidx) 
+function assembly_stokes_cylindric(gr, coordinates, g, ρ, η, 𝓒, εII, PhaseID, KKidx, GGidx, MMidx) 
     
     EL2NOD, EL2NODP, theta, r = gr.e2n, gr.e2n_p1, coordinates.θ, coordinates.r
     
@@ -311,7 +371,8 @@ function assembly_stokes_cylindric(gr, coordinates, g, ρ, η, 𝓒, PhaseID,KKi
 
         # ------------------------ NUMERICAL INTEGRATION LOOP (GAUSS QUADRATURE)        
         _ip_loop!(K_blk, M_blk, G_blk, Fb_blk,
-            g, η, 𝓒, ρ, EL2NOD, PhaseID,il:iu,
+            g, η, 𝓒, ρ, εII, 
+            EL2NOD, PhaseID, il:iu,
             dNds, w_ip, nip, nnodel, nelblk, nPdofel,nUdofel,
             dNdx,dNdy,N,N3,NP,
             ω,invJx_double, invJz_double, detJ_PL,
@@ -499,31 +560,24 @@ end
 end
 
 @inline function _ip_loop!(K_blk, M_blk, G_blk, Fb_blk,
-    g, η, 𝓒, ρ, EL2NOD, PhaseID,els,
+    g, η, 𝓒, ρ, εII,
+    EL2NOD, PhaseID,els,
     dNds, w_ip, nip, nnodel, nelblk, nPdofel,nUdofel,
-    dNdx,dNdy,N,N3,NP,
-    ω,invJx_double, invJz_double, detJ_PL,
-    R_21,R_31,Th_21,Th_31,
-    VCOORD_th,VCOORD_r)
+    dNdx, dNdy, N, N3, NP,
+    ω, invJx_double, invJz_double, detJ_PL,
+    R_21, R_31, Th_21,Th_31,
+    VCOORD_th, VCOORD_r)
 
     sin_ip  = similar(detJ_PL)
     cos_ip  = similar(detJ_PL)
-    th_ip = similar(detJ_PL)
-    r_ip = similar(detJ_PL)
-    NP_blk = Matrix{Float64}(undef, length(detJ_PL), 3)
+    th_ip   = similar(detJ_PL)
+    r_ip    = similar(detJ_PL)
+    NP_blk  = Matrix{Float64}(undef, length(detJ_PL), 3)
 
     @inbounds for ip in 1:nip
 
         N_ip = N3[ip]
         NP_blk .= NP[ip].*ones(nelblk)
-
-        #=======================================================================
-        PROPERTIES OF ELEMENTS AT ip-TH EVALUATION POINT
-        =======================================================================#
-        Dens_blk    = _element_density(ρ, EL2NOD, PhaseID, els, NP[ip])
-        Visc_blk    = _element_viscosity(η, EL2NOD, PhaseID, els, NP[ip])
-        #  Gravitational force at ip-th integration point
-        Fg_blk      = g * Dens_blk
 
         #===========================================================================================================
         CALCULATE 2nd JACOBIAN (FROM CARTESIAN TO POLAR COORDINATES --> curved edges), ITS DETERMINANT AND INVERSE
@@ -533,6 +587,16 @@ end
         ===========================================================================================================#
         gemmt!(th_ip,  VCOORD_th', N_ip')
         gemmt!(r_ip,  VCOORD_r', N_ip')
+
+        #=======================================================================
+        PROPERTIES OF ELEMENTS AT ip-TH EVALUATION POINT
+        =======================================================================#
+        # interpolate density onto integration point
+        Dens_blk    = _element_density(ρ, EL2NOD, PhaseID, els, NP[ip])
+        # interpolate viscosity onto integration point
+        Visc_blk    = _element_viscosity(η, EL2NOD, PhaseID, els, NP[ip], εII, r_ip, ip)
+        # Gravitational force at ip-th integration point
+        Fg_blk      = g * Dens_blk
 
         _derivative_weights!(dNds[ip],ω,dNdx,dNdy,w_ip[ip],th_ip,r_ip,sin_ip,cos_ip,
             R_21,R_31,Th_21,Th_31,detJ_PL,invJx_double,invJz_double)
@@ -793,19 +857,54 @@ end
     end
 end
 
-@inline function _element_viscosity(η,EL2NOD,PhaseID,els,Nip)
-    idx = view(EL2NOD,1:3,els)
+@inline function _element_viscosity(η, EL2NOD, PhaseID, els, Nip, εII, r_ip, ip)
+    idx = view(EL2NOD, 1:3, els)
     Visc_blk = vec(view(η.val,idx)'*Nip')
-
-    # Cap max and min viscosities
-    # Visc_blk = max.(Visc_blk,1e18)
-    # Visc_blk = min.(Visc_blk,1e24)
 
     # Make sure a column-vector is returned
     return  Visc_blk
 end
 
-_element_viscosity(η::Isoviscous{T},EL2NOD,PhaseID,els,Nip) where{T} = η.val
+@inline function _element_viscosity(η::TemperatureDependantPlastic, e2n, PhaseID, els, Nip, εII, r_ip, ip)
+    # constant yield stress
+    VonMises = η.τ_VonMises
+    # slope of yield surface
+    slope = 20*VonMises
+    # allocate viscosity at the integration point
+    η_eff = Vector{Float64}(undef, length(els))
+    
+    @inbounds for i in 1:length(els)
+
+        # indices of the element vertices
+        idx = @views e2n[1:3, els[i]]
+        # interpolate temperature to the ip i.e. T_ip = T_nop ⋅ N
+        ηT = η.node[idx[1]]*Nip[1] + η.node[idx[2]]*Nip[2] + η.node[idx[3]]*Nip[3]
+        # 2nd invariant of the strain rate at integration point
+        εII_ip = εII[els[i], ip]
+
+        # should be false only in the 1st time step
+        if εII_ip != 0.0 
+            # yield stress
+            # τy = min(VonMises, (2.22-r_ip[i])*slope)
+            τy = (2.22-r_ip[i])*slope
+            # 'plastic viscosity'
+            ηy = 0.5*τy/εII[els[i], ip]
+            # effective viscosity (cap it: 1e-3 ≤ η ≤ 1e3)
+            η_eff[i] = η.ip[els[i], ip] = max(min(1/(1/ηT + 1/ηy), 1e3), 1e-3)
+            # η_eff[i] = η.ip[els[i], ip] = 1/(1/ηT + 1/ηy)
+
+        else
+            η_eff[i] = η.ip[els[i], ip] = max(min(ηT, 1e3), 1e-3)
+            # η_eff[i] = η.ip[els[i], ip] = ηT
+
+        end
+       
+    end
+
+    return  η_eff
+end
+
+_element_viscosity(η::Isoviscous{T}, EL2NOD, PhaseID, els, Nip, εII, r_ip, ip) where{T} = η.val
 
 @inline function _element_density(ρ,EL2NOD,PhaseID,els,Nip)
     idx = view(EL2NOD,1:3,els)

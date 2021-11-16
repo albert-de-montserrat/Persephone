@@ -14,8 +14,8 @@ function setup_output(path, folder)
     return OUT, iplot
 end
 
-function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, nθ, 
-    nr, particle_fields, particle_info, time2save::Float64, ::Val{Isotropic}) 
+function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, ε, F, FSE, 
+    nθ, nr, particle_fields, particle_info, time2save::Float64, ::Val{Isotropic}) 
 
     # unpack
     path, folder, filename, iplot = 
@@ -63,16 +63,20 @@ function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, nθ,
         Time["t"] = time2save
 
         # mesh variables
-        MESH["nθ"] = nθ                    # create a scalar dataset inside the group
-        MESH["nr"] = nr                     # create a scalar dataset inside the group
+        MESH["nθ"] = nθ # create a scalar dataset inside the group
+        MESH["nr"] = nr # create a scalar dataset inside the group
         
         # physical variables
+        save_viscosity!(VAR, η)
+        VAR["strain_xx"] = ε.xx
+        VAR["strain_zz"] = ε.zz
+        VAR["strain_xz"] = ε.xz
         VAR["Ux"] = Ux
         VAR["Uz"] = Uz
         VAR["Utheta"] = Uθ
         VAR["Ur"] = Ur
         VAR["T"] = T
-        VAR["nu"] = η.val
+        # VAR["nu"] = η.val
         VAR["density"] = ρ
         VAR["Fxx"] = Fxx
         VAR["Fzz"] = Fzz
@@ -95,7 +99,16 @@ function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, nθ,
     end
 end
 
-function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, nθ, nr, 
+function save_viscosity!(VAR, η::TemperatureDependantPlastic)
+    VAR["nu_node"] = η.node
+    VAR["nu_ip"] = η.ip
+end
+
+function save_viscosity!(VAR, η)
+    VAR["nu_node"] = η.val
+end
+
+function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, ε, F, FSE, nθ, nr, 
     particle_fields, particle_info, time2save, ::Val{Anisotropic}) 
 
     # unpack
@@ -148,6 +161,10 @@ function savedata(OUT, Upolar, Ucartesian, T, η, 𝓒, ρ, F, FSE, nθ, nr,
         MESH["nr"] = nr                     # create a scalar dataset inside the group
        
         # physical variables
+        save_viscosity!(VAR, η)
+        VAR["strain_xx"] = ε.xx
+        VAR["strain_zz"] = ε.zz
+        VAR["strain_xz"] = ε.xz
         VAR["Ux"] = Ux
         VAR["Uz"] = Uz
         VAR["Utheta"] = Uθ

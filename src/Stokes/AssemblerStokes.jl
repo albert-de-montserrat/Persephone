@@ -281,8 +281,8 @@ function stokes_immutables(gr, nnod, ndim, nvert, nnodel, nel, nip)
     return  KS, GS, MS, FS, DoF_U, DoF_P, nn, SF_Stokes, ScratchStokes
 end
 
-function stress_shape_functions()
-    ni, nn, nnP, nn3 = Val(6), Val(6), Val(3), Val(3)
+function stress_shape_functions(; nip = 6)
+    ni, nn, nnP, nn3 = Val(nip), Val(6), Val(3), Val(3)
     N, ∇N, _, w_ip = _get_SF(ni,nn)
     NP,_,_,_ = _get_SF(ni,nnP)
     N3,_, dN3ds,_ = _get_SF(ni,nn3)

@@ -74,16 +74,16 @@ function elements_in_node(els)
 end
 
 # Make vtk file of colored grid (WriteVTK pagkage)
-function colored_grid_vtk(colors,M)
-    cells = [MeshCell(VTKCellTypes.VTK_TRIANGLE, M.e2n[i,1:3]) for i in axes(M.e2n,1)]
-    vtkfile = vtk_grid("colored_grid", M.x, M.z, cells)
+function colored_grid_vtk(colors, gr)
+    cells = [MeshCell(VTKCellTypes.VTK_TRIANGLE, gr.e2n[1:3,i]) for i in axes(gr.e2n,2)]
+    vtkfile = vtk_grid("colored_grid", gr.x, gr.z, cells)
     vtkfile["color", VTKCellData()] = colors
     vtk_save(vtkfile)
 end
 
 # Make vtk file of colored grid
 function colored_grid_vtk(colors, x, z, e2n)
-    cells = [MeshCell(VTKCellTypes.VTK_TRIANGLE, e2n[i,1:3]) for i in axes(e2n,1)]
+    cells = [MeshCell(VTKCellTypes.VTK_TRIANGLE, e2n[1:3,i]) for i in axes(e2n,2)]
     vtkfile = vtk_grid("colored_grid", x, z, cells)
     vtkfile["color", VTKCellData()] = colors
     vtk_save(vtkfile)
@@ -98,23 +98,15 @@ function check_colored_mesh(color_list)
     ncolors = length(color_list)
     
     for (nc, node_list) in enumerate(color_list)
-        
         for color in 1:ncolors
-
             if color!=nc
-
                 for node in node_list
-
                     if node ∈ color_list[color]
                         println("node ", node, " found in color ", color)
                     end
-
                 end
-
             end
-
         end
-
     end
 
 end

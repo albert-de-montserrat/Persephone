@@ -21,7 +21,7 @@ function solveDiffusion_threaded(
     ∂Ωt = TBC.Ω
     tfix = TBC.vfix
     tfree = TBC.ifree
-    copyto!(T0,T)
+    copyto!(T0, T)
            
     @timeit to "Thermal diffusion threaded" begin
         # Reset Matrices
@@ -51,19 +51,8 @@ function solveDiffusion_threaded(
         _apply_bcs!(T, MT, FT, ∂Ωt, tfix)
 
         # Solve temperature
-        # if cuda == :off
         # T[tfree] .= MT[tfree, tfree] \ FT[tfree]
         T[tfree], = Krylov.gmres(MT[tfree, tfree], FT[tfree])
-        
-        # else
-        #     @timeit to "Solve" sol, = Krylov.cg(
-        #         CuSparseMatrixCSC(MT[tfree, tfree]), 
-        #         CuVector(FT[tfree])
-        #     )
-        #     @timeit to "Fill T" @tturbo T[tfree] .=  Array(sol)
-        
-        # end
-        # @timeit to "pardiso" _MKLpardiso!(T, MT, FT,tfree)
 
         # Temperature increment
         ΔT = @tturbo T .- T0
@@ -176,8 +165,9 @@ function assemble_element!(
     Me = empty_element_matrices(valA)
     fe = empty_element_force_vector(valA)
 
-    el_dofs = elementdof(DoF_T, iel)
+    el_dofs = DoF_T[iel]
     ρ_el = @SVector [ρ[el_dofs[i]] for i in 1:3]
+    dQdT_el = @SVector [dQdT for _ in 1:6]
 
     # INTEGRATION LOOP
     @inbounds for ip in 1:(A.nip)
@@ -214,19 +204,19 @@ function assemble_element!(
         Ke += (∂N∂x' * κ * ∂N∂x) * ω
         Me += NxN * ω * ρ_ip * Cp
 
-        # # Force vector -- right hand side
-        # if dQdT > 0
-        #     fe += N_ip' * (Δt * dQdT * ω)
-        # end
+        # Force vector -- right hand side
+        if dQdT != 0
+            fe += vec(N_ip) .* dQdT_el * (Δt*ω)
+        end
     end
 
     # Update stiffness matrix 
     return update_stiffness_matrix!(KT, MT, el_dofs, Ke, Me)
 
-    ## Update force vector
-    # if dQdT > 0
-    #     update_force_vector!(FT, fe, el_dofs)
-    # end
+    # Update force vector
+    if dQdT != 0
+        update_force_vector!(FT, fe, el_dofs)
+    end
 end
 
 empty_element_matrices(::Val{sz}) where {sz} = zeros(SMatrix{sz,sz})
@@ -235,7 +225,6 @@ empty_element_matrices(::Val{sI}, ::Val{sJ}) where {sI, sJ} = zeros(SMatrix{sI, 
 
 empty_element_force_vector(::Val{sz}) where {sz} = zeros(SVector{sz})
 
-elementdof(d::DoFHandler, i) = d.DoF[i]
 
 function update_stiffness_matrix!(K::SparseMatrixCSC{Float64,Int64}, el_dofs, Ke)
     @inbounds for (_j, j) in enumerate(el_dofs), (_i, i) in enumerate(el_dofs)

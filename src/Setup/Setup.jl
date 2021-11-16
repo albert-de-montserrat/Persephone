@@ -3,6 +3,7 @@ struct ThermalParameters{T}
     α::T
     Cp::T
     dQdT::T
+    H::T
 end
 
 function thermal_parameters(; 
@@ -10,8 +11,9 @@ function thermal_parameters(;
     α = 1e-6,
     Cp = 1.0,
     dQdT = 0.0,
+    H = 0.0
 )
-    ThermalParameters(κ, α, Cp, dQdT)
+    ThermalParameters(κ, α, Cp, dQdT, H)
 end
 
 function init_U_P(gr)

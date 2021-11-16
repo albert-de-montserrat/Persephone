@@ -4,44 +4,20 @@ struct BC{T,N}
     vfix::Vector{N}
 end
 
-function init_BCs(gr, IDs; Ttop = 0.0, Tbot = 1.0, type="free slip" )
-    TBC = temperature_bcs(gr, IDs; Ttop = Ttop, Tbot =Tbot)
-    UBC = velocity_bcs(gr, IDs; type=type)
+function init_BCs(gr, IDs; Ttop = 0.0, Tbot = 1.0, velocity_type= :free_slip, temperature_type= :heated)
+    TBC = temperature_bcs(gr, IDs; Ttop = Ttop, Tbot =Tbot, type = temperature_type)
+    UBC = velocity_bcs(gr, IDs; type=velocity_type)
     return TBC, UBC
 end
 
-function velocity_bcs(M::Grid, nr, ids; type="free slip")
-    if type == "free slip"
-        Ωu, ufix = free_slip(nr, ids)
-    elseif type == "no slip"
+function velocity_bcs(M::Grid, ids; type=:free_slip)
+    if type == :free_slip
+        Ωu, ufix = free_slip(ids)
+    elseif type == :no_slip
         Ωu, ufix = no_slip(ids)
     end
 
     nU = maximum(M.e2n)
-    ifree = setdiff(collect(1:2nU),Ωu)
-    BC(Ωu, ifree, ufix)
-end
-
-function velocity_bcs(M::Grid, ids; type="free slip")
-    if type == "free slip"
-        Ωu, ufix = free_slip(ids)
-    elseif type == "no slip"
-        Ωu, ufix = no_slip(ids)
-    end
-
-    nU = maximum(M.e2n)
-    ifree = setdiff(collect(1:2nU),Ωu)
-    BC(Ωu, ifree, ufix)
-end
-
-function velocity_bcs(nU::Int, ids; type="free slip")
-    if type == "free slip"
-        Ωu, ufix = free_slip(ids)
-    elseif type == "no slip"
-        Ωu, ufix = no_slip(ids)
-    end
-
-    # nU = maximum(e2n)
     ifree = setdiff(collect(1:2nU),Ωu)
     BC(Ωu, ifree, ufix)
 end
@@ -88,18 +64,35 @@ function no_slip(ids)
     return Ωu, ufix
 end
 
-function temperature_bcs(M::Grid, ids; Ttop=0.0, Tbot=1.0)
+temperature_bcs(M::Grid, ids; Ttop=0.0, Tbot=1.0, type = :heated) =
+    if type == :heated
+        return heated_bottom(M, ids, Ttop, Tbot)
+    elseif type == :insulated
+        return insulated_bottom(M, ids, Ttop)
+    end
+
+function heated_bottom(M::Grid, ids, Ttop=0.0, Tbot=1.0)
     # Top nodes & temperature
     top_nodes = findall(x->x == "outter", ids)
     top_T = fill(Ttop, length(top_nodes))
 
-    # Top nodes & temperature
+    # Bottom nodes & temperature
     bot_nodes = findall(x->x == "inner", ids)
     bot_T = fill(Tbot, length(top_nodes))
 
     # Concatenate DoFs and T
     ΩT = vcat(top_nodes, bot_nodes)
     tfix = vcat(top_T, bot_T)
+
+    nT = length(M.x)
+    tfree = setdiff(collect(1:nT),ΩT)
+    BC(ΩT, tfree, tfix)
+end
+
+function insulated_bottom(M::Grid, ids, Ttop=0.0)
+    # Top nodes & temperature
+    ΩT = findall(x->x == "outter", ids)
+    tfix = fill(Ttop, length(ΩT))
 
     nT = length(M.x)
     tfree = setdiff(collect(1:nT),ΩT)

@@ -241,7 +241,11 @@ function force_isotropy(a1::T, a2::T) where T
     end
     return a1, a2
 end
+<<<<<<< HEAD
+
+=======
                 
+>>>>>>> d532518a632daaa3c3d94aea1069a10027a93a0b
 function getFSE(F, FSE::FiniteStrain{AnnealingFabricDestruction})
     # F can grow A LOT in long computations, eventually overflowing at ~1e309
     # Thus we need to normalize F from time to time. We normalize F ∈ Ω w.r.t.
@@ -253,7 +257,6 @@ function getFSE(F, FSE::FiniteStrain{AnnealingFabricDestruction})
     end
     return FSE, F
 end
-
 
 function _FSE(F, destruction::FabricDestruction, annealing::Annealing)
     
@@ -275,7 +278,11 @@ function _FSE(F, destruction::FabricDestruction, annealing::Annealing)
     a1u, a2u = unstretch_axes(a1, a2, s)
     # force isotropy in case we unstretched too much
     a1u, a2u = force_isotropy(a1, a2)
+<<<<<<< HEAD
+
+=======
                     
+>>>>>>> d532518a632daaa3c3d94aea1069a10027a93a0b
     if a1u/a2u < ϵ # check whether fabric is destroyed or not
         # Fill FSE
         FSE = FiniteStrainEllipsoid(

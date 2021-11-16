@@ -626,9 +626,10 @@ function T2node(T, particle_fields, particle_info, particle_weights, gr, IDs)
     nn = Array(nodes)
     A1 = kernel2(nn, A, true)
     A2 = kernel2(nn, w, true)
-    T = vec(A1./A2)
+    T .= vec(A1./A2)
     fixT!(T, 0.0, 1.0, IDs)
-    applybounds!(T, 1.0, 0.0) 
+    # T[IDs .== "outter"] .= 0.0
+    applybounds!(T, 1.0, 0.0)
     T
 end
 
