@@ -50,6 +50,7 @@ export Isotropic
 export Anisotropic
 export Isoviscous
 export TemperatureDependant
+export TemperatureDependantPlastic
 export getviscosity
 export getviscosity!
 export state_equation
@@ -82,6 +83,13 @@ export isotropic_lithosphere!
 export healing
 export FiniteStrain
 export Annealing
+export Healing
+export NoHealing
+export AnnealingOnly
+export IsotropicDomainOnly
+export AnnealingIsotropicDomain
+export FabricDestructionOnly
+export AnnealingFabricDestruction
 
 include("IterativeSolvers.jl")
 
@@ -191,11 +199,9 @@ export SymmetricTensor
 export Gradient
 export initstress
 export secondinvariant
+export secondinvariant!
 export stress!
+export deformation_gradient!
 export stress
-
-# include("Stress/Healing.jl")
-# export FiniteStrain
-# export Annealing
 
 end # module
