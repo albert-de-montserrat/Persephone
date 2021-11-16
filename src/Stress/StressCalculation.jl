@@ -25,8 +25,8 @@ function _stress!(
     ε,
     εII,
     τ,
-    η,
-    U,
+#     η,
+#     U,
     e2n,
     iel,
     DoF_U,
@@ -74,7 +74,7 @@ function _stress!(
         ∇N_ip = ∇N[ip]
 
         # ρ at ith integration point
-        η_ip = mydot(SVector{3}([η[e2n[i, iel]] for i in 1:3]), N3_ip)
+#         η_ip = mydot(SVector{3}([η[e2n[i, iel]] for i in 1:3]), N3_ip)
 
         # Polar coordinates of the integration points
         θ_ip = mydot(θ_el, N3_ip)
@@ -106,14 +106,14 @@ function _stress!(
         # strain rate second invariant
         εII[iel, ip] =  √( @muladd(0.5*(εxx*εxx + εzz*εzz) + εxz*εxz))
         
-        # deviatoric stress
-        τxx = η_ip * ( 4*εxx/3 + -2*εzz/3)
-        τzz = η_ip * (-2*εxx/3 +  4*εzz/3)
-        τxz = η_ip *   2*εxz
+#         # deviatoric stress
+#         τxx = η_ip * ( 4*εxx/3 + -2*εzz/3)
+#         τzz = η_ip * (-2*εxx/3 +  4*εzz/3)
+#         τxz = η_ip *   2*εxz
 
-        τ.xx[iel, ip] = τxx
-        τ.zz[iel, ip] = τzz
-        τ.xz[iel, ip] = τxz
+#         τ.xx[iel, ip] = τxx
+#         τ.zz[iel, ip] = τzz
+#         τ.xz[iel, ip] = τxz
         
         # transpose of the velocity gradient
         # ∇Uᵀ = @SMatrix [
@@ -137,9 +137,9 @@ function _stress!(
 
 end
 
-function stress!(ε, εII, τ, η, U, e2n, nel, DoF_U, coordinates, SF_Stress)
+function stress!(ε, εII, U, e2n, nel, DoF_U, coordinates, SF_Stress)
     @batch per=core for iel in 1:nel
-        _stress!(ε, εII, τ, η.node, U, e2n, iel, DoF_U, coordinates.θ, coordinates.r, SF_Stress)
+        _stress!(ε, εII, U, e2n, iel, DoF_U, coordinates.θ, coordinates.r, SF_Stress)
         # _stress!(F, ε, εII, τ, η.node, U, e2n, iel, DoF_U, coordinates.θ, coordinates.r, SF_Stress, Δt)
     end
 end
