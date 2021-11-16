@@ -274,11 +274,7 @@ function _FSE(F, destruction::FabricDestruction, annealing::Annealing)
     a1u, a2u = unstretch_axes(a1, a2, s)
     # force isotropy in case we unstretched too much
     a1u, a2u = force_isotropy(a1, a2)
-<<<<<<< HEAD
 
-=======
-                    
->>>>>>> d532518a632daaa3c3d94aea1069a10027a93a0b
     if a1u/a2u < ϵ # check whether fabric is destroyed or not
         # Fill FSE
         FSE = FiniteStrainEllipsoid(
