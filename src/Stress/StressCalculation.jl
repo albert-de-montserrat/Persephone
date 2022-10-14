@@ -2,6 +2,7 @@ struct SymmetricTensor{T}
     xx::Matrix{T}
     zz::Matrix{T}
     xz::Matrix{T}
+    II::Matrix{T}
 end
 
 struct Gradient{T}
@@ -12,8 +13,8 @@ end
 function initstress(nel; nip = 6)
     F   = [@SMatrix [1.0 0.0; 0.0 1.0]  for _ in 1:nel, _ in 1:nip]
     F0  = deepcopy(F)
-    τ   = SymmetricTensor(fill(0.0,nel,nip),fill(0.0,nel,nip),fill(0.0,nel,nip))
-    ε   = SymmetricTensor(fill(0.0,nel,nip),fill(0.0,nel,nip),fill(0.0,nel,nip))
+    τ   = SymmetricTensor(fill(0.0,nel,nip),fill(0.0,nel,nip),fill(0.0,nel,nip), fill(0.0,nel,nip))
+    ε   = SymmetricTensor(fill(0.0,nel,nip),fill(0.0,nel,nip),fill(0.0,nel,nip), fill(0.0,nel,nip))
     τII = fill(0.0,nel,nip)
     εII = fill(0.0,nel,nip)
     ∇T  = Gradient(fill(0.0,nel,nip), fill(0.0,nel,nip))
@@ -24,6 +25,8 @@ function _stress!(
     # F,
     ε,
     εII,
+    τ,
+    η,
     U,
     e2n,
     iel,
@@ -65,14 +68,15 @@ function _stress!(
 
     # INTEGRATION LOOP
     # onesixth = 1/6
-    @inbounds for ip in 1:7
+    for ip in 1:7
 
         # Unpack shape functions 
         N3_ip = N3[ip]
         ∇N_ip = ∇N[ip]
 
         # ρ at ith integration point
-#         η_ip = mydot(SVector{3}([η[e2n[i, iel]] for i in 1:3]), N3_ip)
+        η_ip = mydot(SVector{3}([η[e2n[i, iel]] for i in 1:3]), N3_ip)
+        # η_ip = η[iel, ip]
 
         # Polar coordinates of the integration points
         θ_ip = mydot(θ_el, N3_ip)
@@ -104,14 +108,22 @@ function _stress!(
         # strain rate second invariant
         εII[iel, ip] =  √( @muladd(0.5*(εxx*εxx + εzz*εzz) + εxz*εxz))
         
-#         # deviatoric stress
-#         τxx = η_ip * ( 4*εxx/3 + -2*εzz/3)
-#         τzz = η_ip * (-2*εxx/3 +  4*εzz/3)
-#         τxz = η_ip *   2*εxz
+        # deviatoric stress
+        # τxx = η_ip * ( 4*εxx/3 + -2*εzz/3)
+        # τzz = η_ip * (-2*εxx/3 +  4*εzz/3)
+        # τxz = η_ip *   2*εxz
+        stress = 2.0 * η_ip * @SMatrix [
+            εxx-(εxx+εzz)/3.0   εxz
+            εxz                 εzz-(εxx+εzz)/3.0
+        ] 
 
-#         τ.xx[iel, ip] = τxx
-#         τ.zz[iel, ip] = τzz
-#         τ.xz[iel, ip] = τxz
+        τxx = stress[1,1]
+        τzz = stress[2,2]
+        τxz = stress[1,2]
+        τ.xx[iel, ip] = τxx
+        τ.zz[iel, ip] = τzz
+        τ.xz[iel, ip] = τxz
+        τ.II[iel, ip] =  √( @muladd(0.5*(τxx*τxx + τzz*τzz) + τxz*τxz))
         
         # transpose of the velocity gradient
         # ∇Uᵀ = @SMatrix [
@@ -135,9 +147,9 @@ function _stress!(
 
 end
 
-function stress!(ε, εII, U, e2n, nel, DoF_U, coordinates, SF_Stress)
+function stress!(ε, εII, τ, η, U, e2n, nel, DoF_U, coordinates, SF_Stress)
     @batch per=core for iel in 1:nel
-        _stress!(ε, εII, U, e2n, iel, DoF_U, coordinates.θ, coordinates.r, SF_Stress)
+        _stress!(ε, εII, τ, η, U, e2n, iel, DoF_U, coordinates.θ, coordinates.r, SF_Stress)
         # _stress!(F, ε, εII, τ, η.node, U, e2n, iel, DoF_U, coordinates.θ, coordinates.r, SF_Stress, Δt)
     end
 end

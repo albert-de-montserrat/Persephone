@@ -45,6 +45,7 @@ Base.Val(x::Isoviscous{Anisotropic})           = Val{Anisotropic}()
 Base.Val(x::TemperatureDependant{Isotropic})   = Val{Isotropic}()
 Base.Val(x::TemperatureDependant{Anisotropic}) = Val{Anisotropic}()
 Base.Val(x::TemperatureDependantPlastic{Isotropic}) = Val{Isotropic}()
+Base.Val(x::TemperatureDependantPlastic{Anisotropic}) = Val{Anisotropic}()
 
 function getviscosity(T, type, nel; η = 1, τ_VonMises = 5e3, nip = 7)
     
@@ -69,7 +70,7 @@ function getviscosity(T, type, nel; η = 1, τ_VonMises = 5e3, nip = 7)
 
     elseif type == :TemperatureDependantAnisotropicPlastic
         # return TemperatureDependant(Anisotropic, @.(exp(13.8156*(0.5-T))), τ_VonMises, nel, nip)
-        return TemperatureDependant(Anisotropic, @.(exp(23.03/(1+T) -23.03/2)), τ_VonMises, nel, nip)
+        return TemperatureDependantPlastic(Anisotropic, @.(exp(23.03/(1+T) -23.03/2)), τ_VonMises, nel, nip)
     
     elseif type == :VanHeckAnisotropic
         return TemperatureDependant{Anisotropic}(@. exp(23.03/(1+T) -23.03/2))
@@ -87,30 +88,31 @@ function getviscosity!(η::TemperatureDependant, T)
     end
 end
 
-function getviscosity!(η::TemperatureDependantPlastic, T, r)
-    @inbounds for i in eachindex(η.node)
-        depth = r[i] - 1.22
-        # viscosity correction from Richards et al. [2001] and Tackley [2000b] 
-        m = T[i] < 0.6 + 2*(1-depth) ? 1 : 0.1 
-        # update viscosity
-        η.node[i] = exp(23.03/(1+T[i]) -23.03/2) * m
-    end
-end
+# function getviscosity!(η::TemperatureDependantPlastic, T, r)
+#     @inbounds for i in eachindex(η.node)
+#         depth = r[i] - 1.22
+#         # viscosity correction from Richards et al. [2001] and Tackley [2000b] 
+#         m = T[i] < 0.6 + 2*(1-depth) ? 1 : 0.1 
+#         # update viscosity
+#         η.node[i] = exp(23.03/(1+T[i]) -23.03/2) * m
+#     end
+# end
 
-function getviscosity!(η::Mallard2016, T, r)
+function getviscosity!(η::TemperatureDependantPlastic, T, r)
 
     # Parameters from Mallard et al 2016 - Nature
     a, B, d0, dstep = 1e6, 30, 0.276, 0.02
 
     # η(z,T) from Mallard et al 2016 - Nature
-    @inbounds for i in eachindex(η)
+    @inbounds for i in eachindex(η.node)
         depth = 2.22 - r[i]
         # viscosity correction 
-        m = T[i] < 0.6 + 7.5*depth ? 1 : 0.1 
+        # m = T[i] < 0.6 + 7.5*depth ? 1 : 0.1 
+        m =1
         # depth dependent component
         ηz = a*exp(log(B)*(1-0.5*(1-tanh((d0-depth)/dstep))))
         # update viscosity
-        η[i] = ηz*exp(0.064 - 30/(T[i]+1))*m
+        η.node[i] = ηz*exp(0.064 - 30/(T[i]+1))*m * 1e5
     end
 end
 

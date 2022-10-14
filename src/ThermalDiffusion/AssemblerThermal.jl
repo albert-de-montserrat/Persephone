@@ -169,7 +169,7 @@ function assemble_element!(
     ρ_el = @SVector [ρ[el_dofs[i]] for i in 1:3]
     dQdT_el = @SVector [dQdT for _ in 1:6]
 
-    # INTEGRATION LOOP
+    # INTEGRATION LOOP4444324
     @inbounds for ip in 1:(A.nip)
         # Unpack shape functions 
         N_ip = N[ip]

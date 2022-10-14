@@ -298,6 +298,6 @@ DMatrix(𝓒, iel, ip, ::Val{Anisotropic}) =
               𝓒.η15[iel,ip] 𝓒.η35[iel,ip] 𝓒.η55[iel,ip]]
 
 DMatrix(𝓒, iel, ip, ::Val{Isotropic}) = 
-    @SMatrix [4/3  -2/3 0
-             -2/3   4/3 0
-              0     0   1]
+    @SMatrix [4/3  -2/3   0.0
+             -2/3   4/3   0.0
+              0.0   0.0   1.0]
